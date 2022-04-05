@@ -9,7 +9,7 @@
 
 // General macro parameters
 bool          isRealData    = false;
-std::string   fFileName     = "files/BlipAna_20220321_Eminus_0to5MeV_LowThresh.root";
+std::string   fFileName     = "files/BlipAna_20220324_Eminus_0to5MeV_LowThresh.root";
 std::string   fOutName      = "output/plots.root";
 std::string   fTreeName     = "blipana/anatree";
 
@@ -117,8 +117,8 @@ void makeHistograms(){
   // Energy threshold
   dir_thresh = fOutFile->mkdir("EnergyThreshold");
   dir_thresh->cd();
-  float emax = 4000.; // keV
-  int   ebins = 40; 
+  float emax = 3000.; // keV
+  int   ebins = 60; 
   h_thresh_true_energy = new TH1D("true_energy","True blip energy;True electron energy dep [keV];",ebins,0,emax);
   h_thresh_reco3D = new TH1D("reco3D","Reconstructed 3D blips;True electron energy dep [keV]",ebins,0,emax);
   h_thresh3D = new TH1D("3Dthresh","Reconstructed threshold 3D;True electron energy dep [keV]",ebins,0,emax);
@@ -177,7 +177,6 @@ void configure(){
   fTree->SetBranchAddress("edep_z",&edep_z);                        
   fTree->SetBranchAddress("edep_ds",&edep_ds);                      
   fTree->SetBranchAddress("nhits",&nhits);                         
-  fTree->SetBranchAddress("hit_tpc",&hit_tpc);                      
   fTree->SetBranchAddress("hit_plane",&hit_plane);                  
   fTree->SetBranchAddress("hit_wire",&hit_wire);                    
   fTree->SetBranchAddress("hit_channel",&hit_channel);              
@@ -457,14 +456,29 @@ void makePlots(){
     c_th->Write();
    
     // Print out 50% crossings
- 
-    for(size_t i=0; i<kNplanes;i++){
-      float thresh = GetThreshold(gr_thresh[i],0.5);
-      std::cout<<"50% threshold crossing for plane "<<i<<" is "<<thresh<<" keV.\n";
-    }
+    float effthresh;
 
-    std::cout<<"50% threshold crossing for 3D is "<<GetThreshold(gr_thresh3D,0.5)<<" keV.\n";
-  
+    effthresh = 0.2;
+    for(size_t i=0; i<kNplanes;i++){
+      float thresh = GetThreshold(gr_thresh[i],effthresh);
+      std::cout<<effthresh*100.<<"% threshold crossing, plane "<<i<<" --> "<<thresh<<" keV.\n";
+    }
+    std::cout<<100*effthresh<<"% threshold crossing for 3D --> "<<GetThreshold(gr_thresh3D,effthresh)<<" keV.\n\n";
+    
+    effthresh = 0.5;
+    for(size_t i=0; i<kNplanes;i++){
+      float thresh = GetThreshold(gr_thresh[i],effthresh);
+      std::cout<<effthresh*100.<<"% threshold crossing, plane "<<i<<" --> "<<thresh<<" keV.\n";
+    }
+    std::cout<<effthresh*100.<<"% threshold crossing for 3D --> "<<GetThreshold(gr_thresh3D,effthresh)<<" keV.\n\n";
+ 
+    
+    effthresh = 0.8;
+    for(size_t i=0; i<kNplanes;i++){
+      float thresh = GetThreshold(gr_thresh[i],effthresh);
+      std::cout<<effthresh*100.<<"% threshold crossing, plane "<<i<<" --> "<<thresh<<" keV.\n";
+    }
+    std::cout<<effthresh*100.<<"% threshold crossing for 3D --> "<<GetThreshold(gr_thresh3D,effthresh)<<" keV.\n\n";
 
   }
 

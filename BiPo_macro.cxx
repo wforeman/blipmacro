@@ -9,12 +9,14 @@
   #include <time.h>
   
   // --- Choose dataset ---
-  int   fPhase            = 1;
+  int   fPhase  = 2;
   
   // --- Input files ---
-  std::string fFileName[2]= { "files/BlipAna_20220316_RadonData_FullChain_Phase1.root",
-                              "files/BlipAna_20220316_RadonData_FullChain_Phase2.root" };
+  std::string fFileName[2]= { "files/BlipAna_20220405_RadonData_Phase1.root",
+                              "files/BlipAna_20220405_RadonData_Phase2.root" };
   
+  std::string fTreeName = "blipanaTrkMask/anatree";
+
   // --- Time periods in UNIX time ---
   unsigned int fPhase_T0[2] = {  1627415210, 1627594369 };
   unsigned int fPhase_T1[2] = {  1627592728, 1627761265 };
@@ -23,16 +25,15 @@
   
   // --- General macro parameters ---
   int   fSubtractionMode   = 2;     // 0= none; 1= subtract flip; 2= subtract shift 
-  bool  fPickyBlipMode    = true;   // Require blips match on all 3 planes
+  bool  fPickyBlipMode    = false;   // Require blips match on all 3 planes
   int   fMinTick          = 0;      // min waveform tick to start search (0-6400 ticks)
   int   fWireRange        = 1;      // +/- range to look for alpha candidate
   float fMaxClusterSpan   = 30;     // Veto clusters longer than this [ticks]
   float fMinGOF           = -999;   // pulse train hits have gof < 0
-  float fBetaCharge_min   = 2.5e3;    // Min charge of beta candidate blip [e-]
+  float fBetaCharge_min   = 2e3;    // Min charge of beta candidate blip [e-]
   float fBetaCharge_max   = 100e3;  // Max charge of beta candidate blip [e-]
-  int   fBetaHits_max     = 999;
   float fAlphaCharge_min  = 0e3;    // Min charge of alpha candidate cluster [e-]
-  float fAlphaCharge_max  = 10e3;   // Max charge of alpha candidate cluster [e-]
+  float fAlphaCharge_max  = 5e3;   // Max charge of alpha candidate cluster [e-]
   int   fAlphaHits_max    = 999;    // Max hits in alpha candidate cluster
   bool  fAlphaReq3D       = false;  // Require alpha pulse be 3D-matched
   float fdT_binSize       = 20.;    // Bin width for all dT spectra plots [us]
@@ -58,11 +59,20 @@
   
   // --- Noisy wires to skip (collection plane) ---
   std::vector<int> fNoisyWires{
-  0, 1, 2, 83, 384, 1247, 1535, 1540, 1919, 1920, 2303, 2334, 2335, 2400, 2415, 2465, 
-  2687, 3071, 3072, 3408, 3412, 3422, 3423, 3424, 3425, 3426, 3428, 3429, 3432, 3433, 
-  3435, 3437, 3438, 3439, 3442, 3444, 3445, 3446, 3448, 3449, 3452, 3453, 3455
+  //0, 1, 2, 83, 384, 1247, 1535, 1540, 1919, 1920, 2303, 2334, 2335, 2400, 2415, 2465, 
+  //2687, 3071, 3072, 3408, 3412, 3422, 3423, 3424, 3425, 3426, 3428, 3429, 3432, 3433, 
+  //3435, 3437, 3438, 3439, 3442, 3444, 3445, 3446, 3448, 3449, 3452, 3453, 3455
+  //};
+  0, 1, 2, 3, 6, 7, 9, 10, 11, 16, 72, 80, 83, 85, 384, 1151, 1152, 1247, 1535, 1540, 
+  1716, 1919, 1920, 2111, 2229, 2230, 2297, 2298, 2300, 2301, 2303, 2304, 2309, 2311, 
+  2327, 2329, 2330, 2333, 2334, 2335, 2400, 2415, 2464, 2465, 2681, 2686, 2687, 2705, 
+  2732, 2733, 2753, 2764, 2783, 2789, 2879, 3071, 3072, 3215, 3251, 3263, 3269, 3274, 
+  3280, 3286, 3289, 3294, 3295, 3299, 3313, 3318, 3327, 3335, 3336, 3338, 3339, 3342, 
+  3345, 3347, 3348, 3351, 3353, 3359, 3360, 3361, 3378, 3385, 3391, 3408, 3409, 3410, 
+  3411, 3412, 3413, 3415, 3416, 3418, 3419, 3420, 3421, 3422, 3423, 3424, 3425, 3426, 
+  3427, 3428, 3429, 3430, 3431, 3432, 3433, 3434, 3435, 3436, 3437, 3438, 3439, 3441, 
+  3442, 3443, 3444, 3445, 3446, 3447, 3448, 3449, 3451, 3452, 3453, 3454, 3455
   };
-  
   
   //#######################################################################
   // Derived parameters
@@ -168,6 +178,10 @@
   TH1D* h_alpha_charge_flip;
   TH1D* h_alpha_charge_shift;
   TH1D* h_alpha_charge_sub;
+  TH1D* h_beta_charge;
+  TH1D* h_beta_charge_flip;
+  TH1D* h_beta_charge_shift;
+  TH1D* h_beta_charge_sub;
   
   //##########################################################################
   // Initialize histograms
@@ -211,12 +225,19 @@
     h_cand_dT_sub   = (TH1D*)h_cand_dT->Clone("cand_dT_sub");   h_cand_dT_sub   ->SetTitle("Background-subtracted spectrum");
     h_clust_dT      = (TH1D*)h_cand_dT->Clone("clust_dT");      h_clust_dT      ->SetTitle("Same-wire cluster separations");
     
-    h_alpha_charge      = new TH1D("alpha_charge","Candidate alphas;Collection Plane Charge [e];Events", 500,0,50e3);
+    h_alpha_charge      = new TH1D("alpha_charge","Candidate alphas;Collection Plane Charge [e];Events", 50,0,5e3);
     h_alpha_charge_flip = (TH1D*)h_alpha_charge->Clone("alpha_charge_flip");
     h_alpha_charge_shift = (TH1D*)h_alpha_charge->Clone("alpha_charge_shift");
     h_alpha_charge_sub = (TH1D*)h_alpha_charge->Clone("alpha_charge_sub");
+    h_alpha_charge_sub  ->SetTitle("Candidate alphas after background subtraction");
     
-    int timeBins    = 5; float timeMax = 45;
+    h_beta_charge      = new TH1D("beta_charge","Candidate betas;Collection Plane Charge [e];Events", 500,0,50e3);
+    h_beta_charge_flip = (TH1D*)h_beta_charge->Clone("beta_charge_flip");
+    h_beta_charge_shift = (TH1D*)h_beta_charge->Clone("beta_charge_shift");
+    h_beta_charge_sub = (TH1D*)h_beta_charge->Clone("beta_charge_sub");
+    h_beta_charge_sub  ->SetTitle("Candidate betas after background subtraction");
+    
+    int timeBins    = 9; float timeMax = 45;
     h_time_vs_dT      = new TH2D("time_vs_dT",";Event time [hr];Time difference [#mus]",timeBins,0,timeMax, dTbins,0,fdT_max);
     h_time_vs_dT      ->SetOption("colz");
     h_time_vs_dT_flip = (TH2D*)h_time_vs_dT->Clone("time_vs_dT_flip");
@@ -267,7 +288,7 @@
 
     // open the file and set up the TTree
     TFile* file = new TFile(_fileName.c_str(),"READ");
-    fTree = (TTree*)file->Get("blipana/anatree");
+    fTree = (TTree*)file->Get(fTreeName.c_str());
   
     // set branches
     fTree->SetBranchAddress("event",&event);                         
@@ -279,7 +300,6 @@
     fTree->SetBranchAddress("nclusts",&nclusts);                     
     fTree->SetBranchAddress("clust_plane",&clust_plane);              
     fTree->SetBranchAddress("clust_wire",&clust_wire);                
-    fTree->SetBranchAddress("clust_chan",&clust_chan);                
     fTree->SetBranchAddress("clust_nhits",&clust_nhits);              
     fTree->SetBranchAddress("clust_charge",&clust_charge);            
     fTree->SetBranchAddress("clust_time",&clust_time);                
@@ -288,7 +308,6 @@
     fTree->SetBranchAddress("clust_timespan",&clust_timespan);          
     fTree->SetBranchAddress("clust_blipid",&clust_blipid);            
     fTree->SetBranchAddress("nblips",&nblips);                       
-    fTree->SetBranchAddress("blip_tpc",&blip_tpc);                   
     fTree->SetBranchAddress("blip_nplanes",&blip_nplanes);
     fTree->SetBranchAddress("blip_maxdiff",&blip_maxdiff);
     fTree->SetBranchAddress("blip_x",&blip_x);                        
@@ -316,7 +335,7 @@
 
     // Keep list of cluster counts per wire/channel
     std::map<int,int> map_wn;
-    std::map<int,int> map_chn;
+    //std::map<int,int> map_chn;
     
     // Record start-time
     std::time_t loopStart = time(0);
@@ -363,7 +382,7 @@
         if( clust_plane[i] != 2 ) continue;
         _map_wire_clusters[clust_wire[i]].push_back(i);
         map_wn[clust_wire[i]] += 1;
-        map_chn[clust_chan[i]] += 1;
+        //map_chn[clust_chan[i]] += 1;
         h_clust_timespan->Fill(clust_timespan[i]);
         h_wt_clusts->Fill(clust_wire[i],clust_lhit_peakT[i]);
       }
@@ -446,8 +465,7 @@
   
         // apply charge/size cuts on beta
         if(   clust_charge[ic] < fBetaCharge_min 
-          ||  clust_charge[ic] > fBetaCharge_max 
-          ||  clust_nhits[ic] > fBetaHits_max ) continue;
+          ||  clust_charge[ic] > fBetaCharge_max ) continue;
         
         // evaluate if in fiducial volume
         if( blip_z[iBlip] < fZmin || blip_z[iBlip] > fZmax ) continue;
@@ -478,6 +496,7 @@
         int nclusts_inwindow        = 0;
         int nclusts_inwindow_flip   = 0;
         int nclusts_inwindow_shift  = 0;
+        int nclusts_inwindow_shift2  = 0;
   
         // assign wire range
         int refwire = clust_wire[ic] + fRandomWireShift;
@@ -499,7 +518,8 @@
         // -------------------------------------------
         // Search for background candidates (wire shift)
         int shift = 2*fWireRange+1;
-        std::vector<BiPoCandidate> v_cands_shift = FindCandidates(ic, w0+shift, w1+shift, false, nclusts_inwindow_shift);
+        std::vector<BiPoCandidate> v_cands_shift  = FindCandidates(ic, w0+shift, w1+shift, false, nclusts_inwindow_shift);
+        std::vector<BiPoCandidate> v_cands_shift2 = FindCandidates(ic, w0-shift, w1-shift, false, nclusts_inwindow_shift2);
   
         
         // --------------------------------------------
@@ -516,13 +536,16 @@
             _clustAvailable[thisCand.id2] = false;
             int blipid = clust_blipid[thisCand.id2];
             if( blipid >= 0 ) _blipAvailable[blipid] = false;
-            if( thisCand.dT > 6.25 && thisCand.dT < 312.5 ) _numBiPo_6_312 += weight;
+            if( thisCand.dT > 6.25 && thisCand.dT < 312.5 ) {
+              _numBiPo_6_312 += weight;
+              h_timeFine_vs_rate  ->Fill(eventHour,weight);
+            }
             if( thisCand.dT >= fdT_min ) {
               _numBiPo += weight;
+              h_beta_charge       ->Fill(thisCand.q1,weight);
               h_alpha_charge      ->Fill(thisCand.q2,weight);
               h_cand_dT           ->Fill(thisCand.dT,weight);
               h_time_vs_dT        ->Fill(eventHour,thisCand.dT,weight);
-              h_timeFine_vs_rate  ->Fill(eventHour,weight);
             }
           }//endloop over candidates
         }//end evaluation of standard cands
@@ -536,6 +559,7 @@
           float weight = 1./v_cands_flip.size();
           for(auto& thisCand : v_cands_flip ) {
             if( thisCand.dT >= fdT_min ) {
+              h_beta_charge_flip  ->Fill(thisCand.q1,weight);
               h_alpha_charge_flip ->Fill(thisCand.q2,weight);
               h_cand_dT_flip      ->Fill(thisCand.dT,weight);
               h_time_vs_dT_flip   ->Fill(eventHour,thisCand.dT,weight);
@@ -545,12 +569,25 @@
         
   
         // --------------------------------------------
-        // Evaluate dT-flip candidates
+        // Evaluate dT-shift candidates
         // ---------------------------------------------
         if( v_cands_shift.size() && v_cands_shift.size() <= fMaxCandidates && nclusts_inwindow_shift <=  fMaxClustMult ) {
-          float weight = 1./v_cands_shift.size();
+          float weight = 0.5/v_cands_shift.size();
           for(auto& thisCand : v_cands_shift ) {
             if( thisCand.dT >= fdT_min ) {
+              h_beta_charge_shift ->Fill(thisCand.q1,weight);
+              h_alpha_charge_shift->Fill(thisCand.q2,weight);
+              h_cand_dT_shift     ->Fill(thisCand.dT, weight);
+              h_time_vs_dT_shift  ->Fill(eventHour,thisCand.dT, weight);
+            }
+          }//endloop over candidates
+        }//end evaluation of wire-shift candidates
+        
+        if( v_cands_shift2.size() && v_cands_shift2.size() <= fMaxCandidates && nclusts_inwindow_shift2 <=  fMaxClustMult ) {
+          float weight = 0.5/v_cands_shift2.size();
+          for(auto& thisCand : v_cands_shift2 ) {
+            if( thisCand.dT >= fdT_min ) {
+              h_beta_charge_shift ->Fill(thisCand.q1,weight);
               h_alpha_charge_shift->Fill(thisCand.q2,weight);
               h_cand_dT_shift     ->Fill(thisCand.dT, weight);
               h_time_vs_dT_shift  ->Fill(eventHour,thisCand.dT, weight);
@@ -571,6 +608,9 @@
     // ****************************************************
     double loopDuration = ( time(NULL) - loopStart );
     
+    h_cand_dT->Sumw2();
+    h_cand_dT_flip->Sumw2();
+    h_cand_dT_shift->Sumw2();
 
     // ***************************************************
     // Scale dT plots so they're per readout
@@ -590,17 +630,20 @@
     h_cand_dT_sub     ->Add(h_cand_dT,      1);
     h_time_vs_dT_sub  ->Add(h_time_vs_dT,   1);
     h_alpha_charge_sub->Add(h_alpha_charge, 1);
+    h_beta_charge_sub->Add(h_beta_charge, 1);
     
     switch(fSubtractionMode) {
       case 1: 
         h_cand_dT_sub     ->Add(h_cand_dT_flip,     -1);
         h_time_vs_dT_sub  ->Add(h_time_vs_dT_flip,  -1);
         h_alpha_charge_sub->Add(h_alpha_charge_flip,-1);
+        h_beta_charge_sub->Add(h_beta_charge_flip,-1);
         break;
       case 2:
         h_cand_dT_sub     ->Add(h_cand_dT_shift,     -1);
         h_time_vs_dT_sub  ->Add(h_time_vs_dT_shift,  -1);
         h_alpha_charge_sub->Add(h_alpha_charge_shift,-1);
+        h_beta_charge_sub->Add(h_beta_charge_shift,-1);
         break;
     }
     
@@ -609,7 +652,7 @@
     // ***************************************************
     // Check for noisy wires if doing wire diagnostics
     // ***************************************************
-    float noiseThresh = 0.4;
+    float noiseThresh = 0.15;
     if( fDoWireDiagnostics ) {
       std::cout<<"Noisy wires (>"<<noiseThresh<<" cands/evt): \n";
       int nNoisy = 0; 
@@ -698,19 +741,19 @@
   
     TH1D* h1  = h_time_vs_rate_bipo; //(TH1D*)h_time_vs_rate_bipo->Clone("bipo");
     TH1D* h2  = (TH1D*)h_time_vs_rate_bg->Clone("bg");
-    TH1D* h3  = (TH1D*)h_time_vs_rate_sum->Clone("sum");
+    //TH1D* h3  = (TH1D*)h_time_vs_rate_sum->Clone("sum");
     FormatTH1D(h1, kBlue, 1, 3 );
     FormatTH1D(h2, kRed, 1, 3 );
-    FormatTH1D(h3, kBlack, 1, 3 );
+    //FormatTH1D(h3, kBlack, 1, 3 );
     
     std::string name = "c_time_vs_rate";
     TCanvas* c = new TCanvas(name.c_str(),name.c_str(),600,500);
     //float max = std::max( GetHistMax(h1), GetHistMax(h2) );
-    float max = GetHistMax(h3);
+    float max = std::max(GetHistMax(h1),GetHistMax(h2));
     h1->GetYaxis()->SetRangeUser(0,max*1.2);
     h1->DrawCopy();
     h2->DrawCopy("same");
-    h3->DrawCopy("same");
+    //h3->DrawCopy("same");
     fOutFile_plots->cd();
     c->Write();
     
@@ -725,34 +768,34 @@
   
     FitResult out;
   
-    //if( h->GetEntries() < 20 ) return out;
-  
     std::cout<<"Fitting dT spectrum "<<h->GetTitle()<<", "<<h->GetEntries()<<"\n";
     std::string label = h->GetName();
     TCanvas* c = new TCanvas(Form("c_fit_%s",label.c_str()),Form("c_fit_%s",label.c_str()),600,500);
     TH1D* hc = (TH1D*)h->Clone();
-    
-    // Define fit function, initialize parameters
     float histMax = GetHistMax(hc);
+   
+    /*
+    // Define fit function, initialize parameters
     TF1* fit = new TF1("FullFit","[0] + [1]*exp(-x/[2]) + [3]*exp(-x/[4])",fdT_min,fdT_max);
     fit->SetParameter(0, histMax/5 );
     fit->SetParLimits(0, 0, histMax );
-    fit->SetParameter(1, histMax/5 );
-    fit->SetParLimits(1, 0, histMax );
-    fit->SetParameter(2, 15 );
-    fit->SetParLimits(2, 5, 40);
-    fit->SetParameter(3, histMax );
-    fit->SetParLimits(3, 0, histMax*2 );
-    fit->FixParameter(4, 164.5 );
-    
-    // TEMP: fix flat background
-    //fit->FixParameter(0, 0.001597);
-    //fit->FixParameter(0,0);
-    fit->FixParameter(1,0);
-    fit->FixParameter(2,0);
-    //fit->FixParameter(2,15);
-    //fit->FixParameter(2,59.);
-  
+    fit->SetParameter(3, histMax/5 );
+    fit->SetParLimits(3, 0, histMax );
+    fit->SetParameter(4, 15 );
+    fit->SetParLimits(4, 5, 40);
+    fit->SetParameter(1, histMax );
+    fit->SetParLimits(1, 0, histMax*2 );
+    fit->FixParameter(2, 164.5 );
+    */
+
+    // *** single exp fit + flat BG ***
+    TF1* fit = new TF1("FullFit","[0] + [1]*exp(-x/[2])",fdT_min,fdT_max);
+    fit->SetParameter(0, histMax/5 );
+    fit->SetParLimits(0, 0, histMax );
+    fit->SetParameter(1, histMax );
+    fit->SetParLimits(1, 0, histMax*2 );
+    fit->FixParameter(2, 164.5 );
+
     // Draw plot and fit
     c->cd();
     hc->Fit(fit,"QR"); 
@@ -775,13 +818,13 @@
     TF1* f_flat = new TF1("flat","[0]");
     f_flat->FixParameter(0, fit->GetParameter(0));
   
-    TF1* f_expBG = (TF1*)f_exp->Clone("expBG");
-    f_expBG->FixParameter(0, fit->GetParameter(1) );
-    f_expBG->FixParameter(1, fit->GetParameter(2) );
+    //TF1* f_expBG = (TF1*)f_exp->Clone("expBG");
+    //f_expBG->FixParameter(0, fit->GetParameter(3) );
+    //f_expBG->FixParameter(1, fit->GetParameter(4) );
     
     TF1* f_bipo = (TF1*)f_exp->Clone("bipo");
-    f_bipo->FixParameter(0, fit->GetParameter(3) );
-    f_bipo->FixParameter(1, fit->GetParameter(4) );
+    f_bipo->FixParameter(0, fit->GetParameter(1) );
+    f_bipo->FixParameter(1, fit->GetParameter(2) );
     
     // Full extrapolated BiPo component; integral of A*exp(-x/B) from 0-infinity is A*B
     float n_bipo  = (f_bipo->GetParameter(0)*f_bipo->GetParameter(1))/fdT_binSize;
@@ -790,20 +833,20 @@
     float N_total = hc      ->Integral(0,hc->GetXaxis()->GetNbins());
     float N_fit   = fit     ->Integral(fdT_min,fdT_max)/fdT_binSize;
     float N_flat  = f_flat  ->Integral(fdT_min,fdT_max)/fdT_binSize;
-    float N_expbg = f_expBG ->Integral(fdT_min,fdT_max)/fdT_binSize;
+    //float N_expbg = f_expBG ->Integral(fdT_min,fdT_max)/fdT_binSize;
     float N_bipo  = f_bipo  ->Integral(fdT_min,fdT_max)/fdT_binSize;
-    float N_bg    = N_flat + N_expbg;
+    float N_bg    = N_flat; //N_expbg;
     float sbratio = N_bipo / N_bg;
     
     printf("================ dT fit =================\n");
-    printf("p0                  : %f +/- %f\n",        fit->GetParameter(0),fit->GetParError(0));
-    printf("p3                  : %f +/- %f\n",        fit->GetParameter(3),fit->GetParError(3));
-    printf("p4                  : %f +/- %f\n",        fit->GetParameter(4),fit->GetParError(4));
+    printf("p0                  : %f +/- %f\n", fit->GetParameter(0),fit->GetParError(0));
+    printf("p1                  : %f +/- %f\n", fit->GetParameter(1),fit->GetParError(1));
+    printf("p2                  : %f +/- %f\n", fit->GetParameter(2),fit->GetParError(2));
     printf("Chi2/ndf            : %f\n",        fit->GetChisquare()/fit->GetNDF());
     printf("Total entries       : %f\n",        hc->GetEntries());
     printf("Total rate          : %f per evt\n",N_total);
     printf(" - BiPo component   : %f per evt\n",N_bipo);
-    printf(" - ExpBG component  : %f per evt\n",N_expbg);
+    //printf(" - ExpBG component  : %f per evt\n",N_expbg);
     printf(" - Flat component   : %f per evt\n",N_flat);
     printf("S/BG ratio          : %f \n",sbratio);
     printf("\n");
