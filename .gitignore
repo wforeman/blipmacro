@@ -1,4 +1,6 @@
 files/*
 output/*
 test/*
+old/*
 *.swp
+*.DS_Store

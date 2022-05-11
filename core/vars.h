@@ -1,6 +1,4 @@
 
-  // Set global constants
-
   // Set max array sizes
 	const int kMaxHits  = 5000;
 	const int kMaxBlips = 1000;
@@ -9,8 +7,7 @@
 	const int kMaxEDeps = 10000;
 	const int kNplanes  = 3;  
   const int kMaxShwrs = 1000;    
-  
-
+ 
   // --- Event information ---   
   int           event;                    // event number
   int           run;                      // run number
@@ -22,15 +19,15 @@
   float total_numElectrons;       // total electrons reaching anode wires
   float gamma_depEnergy;          // total gamma-induced energy deposited
   float gamma_numElectrons;       // total electrons from gamma-induced depositions
-  int   nparticles;               // number of G4 particles
-  int   isPrimary[kMaxG4];        // is primary particle
-  int   trackID[kMaxG4];          // G4 track ID
+  short nparticles;               // number of G4 particles
+  bool  isPrimary[kMaxG4];        // is primary particle
+  short trackID[kMaxG4];          // G4 track ID
   int   pdg[kMaxG4];              // PDG
-  int   nDaughters[kMaxG4];       // number of daughters
-  int   mother[kMaxG4];           // mother particle
+  short nDaughters[kMaxG4];       // number of daughters
+  short mother[kMaxG4];           // mother particle
   float E[kMaxG4];                // initial energy (MeV)
   float endE[kMaxG4];             // final energy (MeV)
-  float mass[kMaxG4];             // mass (MeV)
+  float KE[kMaxG4];
   float P[kMaxG4];                // momentum (MeV)
   float Px[kMaxG4];               // momentum x (MeV)
   float Py[kMaxG4];               // momentum y (MeV)
@@ -44,7 +41,8 @@
   float startT[kMaxG4];           // starting time (us)
   float endT[kMaxG4];             // ending time (us)
   float pathlen[kMaxG4];          // path length (cm)
-  int   numElectrons[kMaxG4];     // electrons reaching anode wires
+  float numElectrons[kMaxG4];     // electrons reaching anode wires
+  float depElectrons[kMaxG4];     // electrons reaching anode wires
   float depEnergy[kMaxG4];        // energy deposited in AV (MeV)
   std::vector<std::string> *process;// process name
 
@@ -56,6 +54,7 @@
   int   edep_clustid[kMaxEDeps];  // hitclust ID
   int   edep_blipid[kMaxEDeps];   // reconstructed blip ID
   float edep_energy[kMaxEDeps];   // total energy deposited (MeV)
+  int   edep_depne[kMaxEDeps];
   float edep_charge[kMaxEDeps];   // total electrons reaching anode wires
   float edep_x[kMaxEDeps];        // x (cm)
   float edep_y[kMaxEDeps];        // y (cm)
@@ -132,50 +131,59 @@
   float shwr_openangle[kMaxShwrs];  // opening angle
   */
 
-	// --- Hit cluster information ---
-  int   nclusts;
-  int   clust_tpc[kMaxHits];
-  int   clust_plane[kMaxHits];
-  int   clust_wire[kMaxHits];
-  int   clust_chan[kMaxHits];
-  int   clust_nwires[kMaxHits];
-  int   clust_nhits[kMaxHits];
-  int   clust_lhit_id[kMaxHits];
-  float clust_lhit_amp[kMaxHits];
-  float clust_lhit_rms[kMaxHits];
-  float clust_lhit_time[kMaxHits];
-  float clust_lhit_peakT[kMaxHits];
-  float clust_lhit_gof[kMaxHits];
-  float clust_charge[kMaxHits];
-  float clust_time[kMaxHits];
-  float clust_time_w[kMaxHits];
-  float clust_time_err[kMaxHits];
-  float clust_startTime[kMaxHits];
-  float clust_endTime[kMaxHits];
-  float clust_timespan[kMaxHits];
-  float clust_g4energy[kMaxHits];
-  float clust_g4charge[kMaxHits];
-  int   clust_g4id[kMaxHits];
-  int   clust_ismatch[kMaxHits];
-  //int   clust_isneartrk[kMaxHits];
-  int   clust_blipid[kMaxHits];
-  int   clust_edepid[kMaxHits];
+// --- Hit cluster information ---
+  int   nclusts;                      // total clusters made
+  short clust_tpc[kMaxHits];          // cluster TPC ID
+  short clust_plane[kMaxHits];        // cluster plane 
+  short clust_wire[kMaxHits];         // cluster wire (lead hit wire)
+  short clust_startwire[kMaxHits];
+  short clust_endwire[kMaxHits];
+  short clust_chan[kMaxHits];         // cluster channel (lead hit wire)
+  int   clust_id[kMaxHits];           // cluster ID (index)
+  short clust_nwires[kMaxHits];       // number of wires in this cluster
+  short clust_nhits[kMaxHits];        // number of hits
+  int   clust_lhit_id[kMaxHits];      // lead hit ID (index for hit_X[i] branches)
+  float clust_lhit_amp[kMaxHits];   // lead hit peak amplitude [ADC]
+  float clust_lhit_rms[kMaxHits];   // lead hit RMS [ADC]
+  float clust_lhit_time[kMaxHits];  // lead hit time-tick, corrected for offsets
+  float clust_lhit_peakT[kMaxHits];   // lead hit time-tick, uncorrected (hit->PeakT)
+  float clust_lhit_gof[kMaxHits];     // lead hit goodness-of-fit
+  bool  clust_lhit_isfit[kMaxHits];   // is there a valid goodness of fit for lead hit?
+  bool  clust_ismatch[kMaxHits];      // was this cluster plane-matched?
+  float clust_charge[kMaxHits];       // cluster charge at anode [e-]
+  float clust_time[kMaxHits];         // cluster time-tick
+  float clust_time_w[kMaxHits];       // cluster time-tick (charge-weighted)
+  float clust_time_err[kMaxHits];     // cluster time uncertainty
+  float clust_timespan[kMaxHits];     // cluster timespan
+  float clust_g4energy[kMaxHits];     // true cluster energy from G4
+  float clust_g4charge[kMaxHits];     // true cluster charge at anode
+  int   clust_g4id[kMaxHits];         // true MCParticle ID (index for particle branches)
+  int   clust_blipid[kMaxHits];       // blip ID for this clusteer (if it was made into one)
+  int   clust_edepid[kMaxHits];       // true energy dep ID
 
-  // --- Blip information ---
-  float total_blip_energy;
-  int   nblips;
-  int   blip_tpc[kMaxBlips];
-  int   blip_nplanes[kMaxBlips];
-  float blip_x[kMaxBlips];
-  float blip_y[kMaxBlips];
-  float blip_z[kMaxBlips];
-  float blip_maxdiff[kMaxBlips];
-  float blip_charge[kMaxBlips];
-  float blip_energy[kMaxBlips];
-  int   blip_edepid[kMaxBlips];
-  int   blip_clustid[kNplanes][kMaxBlips];
+ // --- 3D Blip information ---
+  float total_blip_energy;            // total summed blip energy in event [MeV]
+  int   nblips;                       // number of blips in event
+  short blip_id[kMaxBlips];           // blip ID / index
+  short blip_tpc[kMaxBlips];          // blip TPC
+  short blip_nplanes[kMaxBlips];      // number of planes matched (2 or 3)
+  float blip_x[kMaxBlips];            // X position [cm]
+  float blip_y[kMaxBlips];            // Y position [cm]
+  float blip_z[kMaxBlips];            // Z position [cm]
+  float blip_maxdiff[kMaxBlips];      // difference in wire intersection points
+  float blip_charge[kMaxBlips];       // blip charge at anode [e-]
+  float blip_energy[kMaxBlips];       // blip energy [MeV]
+  //float blip_energyESTAR[kMaxBlips];
+  int   blip_edepid[kMaxBlips];       // true energy dep ID
+  //int   blip_clustid[kNplanes][kMaxBlips];  // cluster ID per plane
+  float blip_trkdist[kMaxBlips];      // distance to nearest track
   int   blip_clustid_pl2[kMaxBlips];
-  float blip_trkdist[kMaxBlips];
+  int   blip_clustid_pl1[kMaxBlips];
+  int   blip_clustid_pl0[kMaxBlips];
+
+  // --- lifetime calibration info ---
+  float calib_lifetime;
+  float calib_lifetime_err;
 
 
 //################################
@@ -190,7 +198,7 @@ void printG4Particle(int i) {
   startPointy[i],
   startPointz[i],
   pathlen[i],
-  E[i]-mass[i],
+  KE[i],
   depEnergy[i],
   startT[i],
   endT[i],

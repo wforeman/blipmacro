@@ -7,39 +7,14 @@
 #include "core/vars.h"
 #include "core/tools.h"
 
-// General macro parameters
-bool          isRealData    = false;
+// -- General macro parameters --
 std::string   fFileName     = "files/BlipAna_Eminus_0to5MeV_Overlay_Standard_20220422.root";
-std::string   fOutName      = "output/plots.root";
 std::string   fTreeName     = "blipanaCosFilt/anatree";
 
-// Histograms
-TDirectory* dir_diag;
-TDirectory* dir_thresh;
-TH1D*   h_totalVisE;
-TH1D*   h_edep_charge;
-TH1D*   h_true_charge;
-TH1D*   h_true_charge_75keV;
-TH1D*   h_true_charge_150keV;
-TH1D*   h_true_charge_300keV;
-TH1D*   h_reco_charge;
-TH1D*   h_reco_charge_plane[kNplanes];
-TH1D*   h_charge_frac[kNplanes];    // fraction of true charge reconstructed
-TH1D*   h_hit_purity[kNplanes];     // (sel #hits)/(total true #hits)
-TH1D*   h_hit_comp[kNplanes];       // (sel true #hits)/(total true #hits)
-TH1D*   h_nhits[kNplanes][2];       // --- hit diagnostics ---
-TH1D*   h_hitamp[kNplanes][2];
-TH1D*   h_hitrms[kNplanes][2];
-TH1D*   h_hitratio[kNplanes][2];
-TH1D*   h_hitneighbors[kNplanes][2];
-TH2D*   h_hitrms_vs_amp[kNplanes][2];
-TH2D*   h_nelec_TrueVsReco[kNplanes];
-TH1D*   h_nelec_Resolution[kNplanes];
-TH1D*   h_clust_dT;                 // --- interplane timing ---
-TH1D*   h_clust_dTfrac;
-TH1D*   h_thresh_true_energy;       // --- for threshold calc ---
-TH1D*   h_thresh_reco3D;
+// --- Histograms ---
+TH1D*   h_thresh_true_energy;
 TH1D*   h_thresh_reco[3];
+TH1D*   h_thresh_reco3D;
 TH1D*   h_thresh[3];
 TH1D*   h_thresh3D;
 TH2D*   h_blip_zy;
@@ -50,8 +25,10 @@ TH1D*   h_blip_xres;
 TTree*  fTree;
 TFile*  fOutFile;
 
+std::string _outName = "output/plots_threshold_" + fFileName;
+fOutFile = new TFile(_outFileName.c_str(), "recreate");
+
 // Macro Functions
-void    configure();
 void    makeHistograms();
 void    makePlots();
 float   GetThreshold(TGraph*,float);
@@ -59,69 +36,22 @@ float   GetThreshold(TGraph*,float);
 //#################################################################################
 void makeHistograms(){
   
-  float chargeMax = 1000;   int chargeBins= 200; // using units of x10^3 electrons
-  h_totalVisE = new TH1D("totalVisE","Total deposited energy;Energy deposited [MeV];Events",  500,0,50.);
-  h_edep_charge = new TH1D("edep_charge","Energy deposition charge;Charge [ #times10^{3} electrons ];Events",chargeBins,0,chargeMax);
-  h_true_charge = new TH1D("true_charge","Total true charge;Charge [ #times10^{3} electrons ];Events",chargeBins,0,chargeMax);
-  h_true_charge_75keV = new TH1D("true_charge_75keV","Total true charge (75 keV threshold);Charge [ #times10^{3} electrons ];Events",chargeBins,0,chargeMax);
-  h_true_charge_150keV = new TH1D("true_charge_150keV","Total true charge (150 keV threshold);Charge [ #times10^{3} electrons ];Events",chargeBins,0,chargeMax);
-  h_true_charge_300keV = new TH1D("true_charge_300keV","Total true charge (300 keV threshold);Charge [ #times10^{3} electrons ];Events",chargeBins,0,chargeMax);
-  //h_true_charge_perfReco = new TH1D("true_charge_perfectReco","Total true charge of reconstructed blips;Charge [ #times10^{3} electrons ];Events",chargeBins,0,chargeMax);
-  h_reco_charge = new TH1D("total_reco_charge","Total reconstructed charge, best plane;Charge [ #times10^{3} electrons ];Events",  chargeBins,0,chargeMax);
-  //h_clust_dT      = new TH1D("clust_dT","Inter-plane hit time separation;dT [ticks]",200,-20,20);
-  //h_clust_dTfrac  = new TH1D("clust_dTfrac","Inter-plane hit time separation; dT/width",120,-3,3);
-  for(int i=0; i<kNplanes; i++) {
-    h_reco_charge_plane[i]  = new TH1D(Form("pl%i_reco_charge",i),Form("Reco charge, plane %i;Charge [ #times10^{3} electrons ];Events",i),chargeBins,0,chargeMax);
-    h_charge_frac[i]        = new TH1D(Form("pl%i_charge_frac",i),Form("Fraction of true charge reco'd, plane %i;Reco charge fraction;Events",i),100,0,2);
-    h_hit_purity[i]         = new TH1D(Form("pl%i_hit_purity",i), Form("Hit purity, plane %i;Purity;Events",i),120,0,1.2);
-    h_hit_comp[i]           = new TH1D(Form("pl%i_hit_comp",i),   Form("Hit completeness, plane %i;Completeness;Events",i),100,0,1.2);
-  }
-  
-  // Blip spatial offset
+  // Blip spatial offset plots
   float Zmin = -100;  float Zmax = 1100;  int Zbins = 300;
   float Ymin = -150;  float Ymax = 150;   int Ybins = 75;
-  float Tmin = 0;     float Tmax = 6400;  int Tbins = 3200/2; 
-  float Wmin = -100;  float Wmax = 3500;  int Wbins = 1800; 
-  h_blip_zy     = new TH2D("blip_zy","Reconstructed blip location;Z [cm]; Y [cm]",70,-100,600,60,-300,300);
+  h_blip_zy     = new TH2D("blip_zy","Reconstructed blip location;Z [cm]; Y [cm]", Zbins,Zmin,Zmax, Ybins, Ymin, Ymax);
   h_blip_zy     ->SetOption("colz");
   h_blip_offset = new TH2D("blip_offset","Blip spatial offset;Z offset [cm];Y offset [cm]",200,-10,10,200,-10,10);
-  h_blip_offset->SetOption("colz");
+  h_blip_offset ->SetOption("colz");
   
-  h_blip_xres   = new TH1D("blip_xres","Blip X-offset;X offset [cm]",200,-5,5);
+  h_blip_xres   = new TH1D("blip_xres","Blip X-offset;X offset [cm]",200,-10,10);
 
-  // Plane hit diagnostics
-  // make subdirectories for histograms
-  dir_diag = fOutFile->mkdir("PlaneDiagnostics");
-  float hitMax  = 150;    int hitBins   = 150;
-  float ampMax = 20;      int ampBins    = 100;
-  float widthMax = 10;    int widthBins = 200;
-  float ratioMax = 30;    int ratioBins = 150;
-  dir_diag->cd();
-  for(int i=0; i<kNplanes; i++) {
-    std::vector<std::string> label = { "noise", "real" };
-    for(int j=0; j<2; j++){
-      h_nhits[i][j]     = new TH1D(Form("pl%i_%s_nhits",i,label[j].c_str()),       Form("Plane %i, %s hits;Number of hits",i,label[j].c_str()),hitBins,0,hitMax);
-      h_hitamp[i][j]     = new TH1D(Form("pl%i_%s_hit_amp",i,label[j].c_str()),      Form("Plane %i, %s hits;Pulse height [ADC]",i,label[j].c_str()),ampBins,0,ampMax);
-      h_hitrms[i][j]  = new TH1D(Form("pl%i_%s_hit_width",i,label[j].c_str()),   Form("Plane %i, %s hits;Hit width [ticks]",i,label[j].c_str()),widthBins,0,widthMax);
-      h_hitratio[i][j]= new TH1D(Form("pl%i_%s_hit_ratio",i,label[j].c_str()), Form("Plane %i, %s hits;Height-to-width ratio",i,label[j].c_str()),  ratioBins,0,ratioMax);
-      h_hitrms_vs_amp[i][j]= new TH2D(Form("pl%i_%s_hit_width_vs_amp",i,label[j].c_str()), Form("Plane %i, %s hits;Hit width [ticks];Pulse height [ADC]",i,label[j].c_str()),  
-        widthBins,0,widthMax,
-        ampBins,0,ampMax);
-    }
-    h_nelec_TrueVsReco[i] = new TH2D( Form("pl%i_nelec_TrueVsReco",i),
-      Form("Plane %i;True hit charge [ #times 10^{3} electrons ];Reconstructed hit charge [ #times 10^{3} electrons ]",i),60,0,30, 60,0,30);
-    h_nelec_TrueVsReco[i]->SetOption("colz");
-    h_nelec_Resolution[i] = new TH1D( Form("pl%i_nelec_res",i),Form("Plane %i;Hit charge resolution: (reco-true)/true",i),200,-2,2);
-  }
-  
-  // Energy threshold
-  dir_thresh = fOutFile->mkdir("EnergyThreshold");
-  dir_thresh->cd();
+  // Energy threshold plots
   float emax = 1.5; // MeV
   int   ebins = 30; 
-  h_thresh_true_energy = new TH1D("true_energy","True blip energy;True electron energy dep [MeV];",ebins,0,emax);
-  h_thresh_reco3D = new TH1D("reco3D","Reconstructed 3D blips;True electron energy dep [MeV]",ebins,0,emax);
-  h_thresh3D = new TH1D("3Dthresh","Reconstructed threshold 3D;True electron energy dep [MeV]",ebins,0,emax);
+  h_thresh_true_energy  = new TH1D("true_energy","True blip energy;True electron energy dep [MeV];",ebins,0,emax);
+  h_thresh_reco3D       = new TH1D("reco3D","Reconstructed 3D blips;True electron energy dep [MeV]",ebins,0,emax);
+  h_thresh3D            = new TH1D("3Dthresh","Reconstructed threshold 3D;True electron energy dep [MeV]",ebins,0,emax);
   for(int i=0; i<kNplanes; i++){
     h_thresh_reco[i] = new TH1D(Form("pl%i_reco",i),Form("Reconstructed clusters, plane %i;True electron energy dep [MeV]",i),ebins,0,emax);
     h_thresh[i] = new TH1D(Form("pl%i_threshold",i),Form("Reconstruction threshold, plane %i;True electron energy dep [MeV]",i),ebins,0,emax);
@@ -131,7 +61,7 @@ void makeHistograms(){
 
 
 //#################################################################################
-void configure(){
+void Threshold_macro(){
   
   // open the file and set up the TTree
   TFile* file = new TFile(fFileName.c_str(),"READ");
@@ -194,12 +124,6 @@ void configure(){
   
   // initialize histograms
   makeHistograms();
-
-}
-
-
-//#################################################################################
-void BlipAna_macro(){
   
   // Configure histograms and TFile
   configure();
@@ -370,7 +294,6 @@ void makePlots(){
 
   if(makeThresholdPlot){
     // Make threshold plot
-    dir_thresh->cd();
     TGraphErrors* gr_thresh[3];
     TGraphErrors* gr_thresh3D;
     TLegend* leg_thresh;
@@ -493,7 +416,6 @@ void makePlots(){
   //*****************************************************
   // Make hit metric plots
 
-  dir_diag->cd();
 
   float mar_l = 0.1;
   float mar_r = 0.03;

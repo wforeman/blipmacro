@@ -12,6 +12,10 @@ float GetHistMax(TH1D* h) {
   return h->GetBinContent(h->GetMaximumBin() );
 }
 
+float GetHistMin(TH1D* h) {
+  return h->GetBinContent(h->GetMinimumBin() );
+}
+
 void AddTextLine(TLatex* t, float x, float y, int lineNum, std::string line){
   t->DrawLatex( x, y-(lineNum-1)*t->GetTextSize(), line.c_str());
 }
@@ -113,6 +117,14 @@ void FormatTH1D(TH1D* h, Color_t lc, int ls, int lwidth){
   h->SetLineStyle(ls);
   h->SetLineWidth(lwidth);
 }
+
+void FormatTH1D(TH1D* h, Color_t lc, int ls, int lwidth, int ms, double msize){
+  FormatTH1D(h, lc, ls, lwidth);
+  h->SetMarkerColor(lc);
+  h->SetMarkerStyle(ms);
+  h->SetMarkerSize(msize);
+}
+
 
 void FormatTGraph(TGraphAsymmErrors* g, Color_t mc, Color_t lc, int ms, int ls, float msize, int lwidth){
   g->SetMarkerColor(mc);
@@ -252,13 +264,18 @@ TH1D* Make1DSlice(const TH2D* h2d, int bin1, int bin2, std::string name)
   float mean = (h2d->GetXaxis()->GetBinCenter(bin1) + h2d->GetXaxis()->GetBinCenter(bin2))/2.;
   name = Form("%s_%d_%d",name.c_str(),bin1,bin2);
   TH1D* h = new TH1D(name.c_str(),Form("1D slice: bins %d-%d (x= %f)",bin1,bin2,mean),nbins,xmin,xmax);
-  for(int i=bin1; i<= bin2; i++){
-    for(int j=1; j<nbins; j++){
-      int bincontent = h2d->GetBinContent(i,j);
-      for(int jj=0; jj<bincontent; jj++) h->Fill(h2d->GetYaxis()->GetBinCenter(j)); //h2d->GetBinContent(i,j));
-    }
-  }
 
+  for(int j=1; j<nbins; j++){
+    float sum_bc = 0;
+    float sum_sqErr = 0;
+    for(int i=bin1; i<=bin2; i++){
+      sum_bc += h2d->GetBinContent(i,j);
+      sum_sqErr += pow(h2d->GetBinError(i,j),2);
+    }
+    h->SetBinContent(j, sum_bc);
+    h->SetBinError(j, sqrt(sum_sqErr) );
+  }
+  
   return h;
 
 }
