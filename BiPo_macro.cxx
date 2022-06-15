@@ -53,7 +53,6 @@
   float fSamplePeriod     = 0.5; // microseconds
   
   // --- Special switches ---
-  bool  fDoWireDiagnostics= false; //true;
   int   fRandomWireShift  = 0; 
   
   // --- Noisy wires to skip (collection plane) ---
@@ -277,14 +276,14 @@
     h_time_vs_rate_bg   = (TH1D*)h_time_vs_rate_bipo->Clone("time_vs_rate_BG");
     h_time_vs_rate_bg   ->SetTitle("Background component");
    
-    for(int i=0; i<timeBins;i++){
+    //for(int i=0; i<timeBins;i++){
       //h_poszy[i]        = new TH2D(Form("zy_%i",i),      "Bipo candidates;Z [cm]; Y [cm]", Zbins/10,  Zmin, Zmax, Ybins/10,  Ymin, Ymax);
       //h_poszy[i]        ->SetOption("colz");
       //h_poszy_shift[i]  = new TH2D(Form("zy_shift_%i",i),"Bipo BG;Z [cm]; Y [cm]",         Zbins/10,  Zmin, Zmax, Ybins/10,  Ymin, Ymax);
       //h_poszy_shift[i]  ->SetOption("colz");
       //h_poszy_sub[i]    = new TH2D(Form("zy_sub_%i",i),  "Post subtraction",               Zbins/10,  Zmin, Zmax, Ybins/10,  Ymin, Ymax);
       //h_poszy_sub[i]    ->SetOption("colz");
-    }
+    //}
 
     if( fIsMC ) {
       h_true_alpha_depne  = (TH1D*)h_alpha_charge->Clone("true_alpha_depne");
@@ -298,30 +297,15 @@
     // =====================================================
     // Diagnotic and utility histograms
     tdir_util->cd();
-
-    if( fDoWireDiagnostics ) 
-    h_nclusts_wire_ave= new TH1D("nclusts_perwire","Average clusters per wire;Average number of clusters per wire",1500,0,3); 
-    //h_clust_dT        = (TH1D*)h_cand_dT->Clone("clust_dT");  h_clust_dT->SetTitle("Same-wire cluster separations");
-    
     h_2D_time_vs_dT      = new TH2D("2D_time_vs_dT",";Event time [hr];Time difference [#mus]",timeBins,0,timeMax, dTbins,0,fdT_max);
     h_2D_time_vs_dT_shift= (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_shift");
     h_2D_time_vs_dT_sub  = (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_sub");
-    
     h_time_vs_N       = new TH1D("time_vs_N",";Event time [hr];Number of entries into dT plot",timeBins,0,timeMax);
-    //h_time_vs_rate_bipo = new TH1D("time_vs_rate_bipo","BiPo component of dT fit;Event time [hr];Rate [sec^{-1}]",timeBins,0,timeMax);
     h_time_vs_ratio     = (TH1D*)h_time_vs_rate_bipo->Clone("time_vs_ratio");
     h_time_vs_ratio     ->SetTitle("Signal-to-background ratio");
     h_time_vs_ratio     ->GetYaxis()->SetTitle("Signal-to-background ratio");
- 
-    //timeBins    = 45; timeMax = 45;
     h_timeFine_vs_evts     = new TH1D("timeFine_vs_evts",";Event time [hr];Number of events",timeBins,0,timeMax);
     h_timeFine_vs_rate  = new TH1D("timeFine_vs_rate",";Event time [hr];Number of candidates per readout",timeBins,0,timeMax);
-  
-    //h_time_vs_ph    = new TH2D("time_vs_ph",";Event time [hr];Average track hit amplitude per evt [ADC]",timeBins,0,timeMax, 100,0,20);
-    //h_time_vs_ph    ->SetOption("colz");
-    //h_time_vs_ntrks = new TH2D("time_vs_ntrks",";Event time [hr];Number of tracks per evt",timeBins,0,timeMax, 80,0,80);
-    //h_time_vs_ntrks    ->SetOption("colz");
-    
   }
   
   
@@ -422,7 +406,7 @@
       
       // ..... quick-test options ...........
       //int maxEvt    = 1000; if(  iEvent >= maxEvt ) break;
-      //int sparsify  = 10; if(  (iEvent % sparsify) != 0 ) continue; 
+      int sparsify  = 10; if(  (iEvent % sparsify) != 0 ) continue; 
       //..................................
 
       // Retrieve event info
@@ -490,34 +474,9 @@
         if( clust_plane[i] != 2 ) continue;
         _map_wire_clusters[clust_wire[i]].push_back(i);
         map_wn[clust_wire[i]] += 1;
-        //map_chn[clust_chan[i]] += 1;
         h_wt_clusts->Fill(clust_wire[i],clust_time[i]);
       }
-    
-      // ====================================================
-      // Wire diagnostics (time-consuming!)
-      // ====================================================
-      if( fDoWireDiagnostics ) {
-
-        for(int i=0; i<=nWiresColl; i++){ // plot cluster separations
-          if( _map_wire_clusters.find(i) == _map_wire_clusters.end() ) continue;
-          
-          std::vector<float> v_t;
-          for(int j=0; j<(int)_map_wire_clusters[i].size(); j++){
-            int id = _map_wire_clusters[i].at(j);
-            v_t.push_back(clust_time[id]*fSamplePeriod);
-          }
-
-          //std::sort(v_t.begin(), v_t.end());
-          //for(int j=1; j<(int)v_t.size(); j++) 
-            //h_clust_dT->Fill(v_t.at(j)-v_t.at(j-1));
-        
-        }
-        
-        continue;
-      
-      }
-
+   
        
       // ===============================================================
       // Clear masks to track blip/cluster availability to avoid double-counts
@@ -853,56 +812,13 @@
       //h_poszy_sub[i]->Add(h_poszy[i],1);
       //h_poszy_sub[i]->Add(h_poszy_shift[i],-1);
     //}
-
    
-    // ***************************************************
-    // Check for noisy wires if doing wire diagnostics
-    // ***************************************************
-    float noiseThresh = 0.25;
-    if( fDoWireDiagnostics ) {
-      std::cout<<"Noisy wires (>"<<noiseThresh<<" cands/evt): \n";
-      int nNoisy = 0; 
-      // populate histogram of average cluster multiplicity per wire
-      if( map_wn.size() ) {
-        for(int iwire=0; iwire<=nWiresColl; iwire++){
-          float a = 0;
-          if( map_wn.find(iwire) != map_wn.end() ) {
-            a = map_wn.at(iwire) / (float)_numEvents;
-            if( a > noiseThresh ) { std::cout<<iwire<<", "; nNoisy++; } 
-          }
-          h_nclusts_wire_ave->Fill(a);
-        }
-        std::cout<<"\n--> Found "<<nNoisy<<" wires with ave clusters/evt > "<<noiseThresh<<"\n";
-      
-        std::cout<<"Checking for bad/missing wires\n";
-        // check for bad/missing wires
-        int nBad = 0; 
-        for(int iwire=0; iwire<=nWiresColl; iwire++){
-          if( map_wn.find(iwire) == map_wn.end() ) {
-            std::cout<<iwire<<", "; nBad++;
-          }
-        }
-        std::cout<<"\n--> Found "<<nBad<<" wires with no activity\n";
-      }
-      
-    }
-  
-
     // ***************************************************
     // Write all histos currently in stack
     // ***************************************************
     fOutFile->Write(); 
- 
-
-    // ***************************************************
-    // Make plots
-    // ***************************************************
     makePlots();
-  
-
-    // ***************************************************
-    // Output summary
-    // ***************************************************
+    
     printf("\n*******************************************\n");
     printf("File                : %s\n",      fFileName[fConfig].c_str()); 
     printf("Total events        : %i\n",      _numEvents); 
