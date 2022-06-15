@@ -66,6 +66,13 @@ void AddPointToGraph( TGraph* gr, float x, float y){
     gr->SetPoint(gr->GetN(), x, y );
 }
 
+TGraphErrors* HistToGraph(TH1D* h) {
+  TGraphErrors* gr = new TGraphErrors();
+  for(size_t i=1; i < h->GetXaxis()->GetNbins(); i++) 
+    AddPointToGraph(gr, h->GetXaxis()->GetBinCenter(i), h->GetBinContent(i));
+  return gr;
+}
+
 void FormatAxes(TH1D* h, float axisTitleSize, float axisLabelSize, float xOffset, float yOffset ){
   h->GetXaxis()->SetLabelSize(axisLabelSize);
   h->GetYaxis()->SetLabelSize(axisLabelSize);
