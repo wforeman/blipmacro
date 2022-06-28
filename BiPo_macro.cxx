@@ -9,15 +9,16 @@
   #include <time.h>
   
   // --- Choose run configuration ---
-  int   fConfig  = 2;
-  bool  fIsMC    = false;
-  float fMaxHr   = -10;
+  int   fConfig   = 2;
+  bool  fIsMC     = false;
+  float fMinHr    = 0;
+  float fMaxHr    = 9e9;
 
   // Filenames 
   std::string fFileName[3]= { 
-      "BlipAna_BiPo_MC_20220503.root",
-      "BlipAna_RadonData_Phase1_20220610.root",
-      "BlipAna_RadonData_Phase2_20220610.root"
+      "BlipAna_20220627_BiPo_MC.root",
+      "BlipAna_20220627_RadonData_Phase1.root",
+      "BlipAna_20220627_RadonData_Phase2.root"
   };
  
 
@@ -406,7 +407,7 @@
       
       // ..... quick-test options ...........
       //int maxEvt    = 1000; if(  iEvent >= maxEvt ) break;
-      int sparsify  = 10; if(  (iEvent % sparsify) != 0 ) continue; 
+      //int sparsify  = 10; if(  (iEvent % sparsify) != 0 ) continue; 
       //..................................
 
       // Retrieve event info
@@ -414,11 +415,12 @@
       _numEvents++;
       
       // Record the event time relative to start of dataset period
-      double eventHour = ( timestamp - fT0[fConfig] ) / 3600.;
-      if( fMaxHr > 0 && eventHour > fMaxHr ) continue;
-      h_time_vs_N->Fill(eventHour);
-      h_timeFine_vs_evts->Fill(eventHour);
-      int eventTimeBin = int(eventHour / 5 );
+      double eventHr = ( timestamp - fT0[fConfig] ) / 3600.;
+      if( eventHr < fMinHr || eventHr > fMaxHr ) continue;
+      
+      h_time_vs_N->Fill(eventHr);
+      h_timeFine_vs_evts->Fill(eventHr);
+      int eventTimeBin = int(eventHr / 5 );
       if( eventTimeBin >= timeBins ) continue;
    
       // Check truth info
@@ -499,7 +501,8 @@
         sortedBlips.push_back(leadID);
         flag[leadID] = true;
       }
-  
+      
+
       // ==============================================================
       // Loop over 3D blips...
       // ==============================================================
@@ -528,7 +531,7 @@
 
         // 3D match cuts for beta
         bool isWorthy = (blip_nplanes[iBlip] >= _betaMinPlanes && blip_sigmayz[iBlip] < _betaMaxDiff);
-       
+        
         if((blip_nplanes[iBlip] == 3 && blip_sigmayz[iBlip] < 3 ) ) h_zy_blips_picky->Fill( blip_z[iBlip], blip_y[iBlip] );
         
         if( !isWorthy ) continue;
@@ -544,8 +547,6 @@
           ||  clust_charge[ic] > fBetaCharge_max ) continue;
        
         // skip if adjacent wires are missing
-  		  //if( std::find(fBadWires.begin(), fBadWires.end(), clust_wire[ic]+1 ) != fBadWires.end() ) continue;
-  		  //if( std::find(fBadWires.begin(), fBadWires.end(), clust_wire[ic]-1 ) != fBadWires.end() ) continue;
         if( wireIsBad[clust_wire[ic]+1] ) continue;
         if( wireIsBad[clust_wire[ic]-1] ) continue;
 
@@ -618,12 +619,7 @@
         ref_shift = refwire + shift;
         w0_shift = w0 + shift;
         w1_shift = w1 + shift;
-  		  if( 
-         //     std::find(fBadWires.begin(), fBadWires.end(), w0_shift ) == fBadWires.end() 
-         // &&  std::find(fBadWires.begin(), fBadWires.end(), w1_shift ) == fBadWires.end() 
-         // &&  std::find(fBadWires.begin(), fBadWires.end(), ref_shift ) == fBadWires.end() 
-          !wireIsBad[w0_shift] && !wireIsBad[w1_shift] && !wireIsBad[ref_shift]
-        ) {
+  		  if( !wireIsBad[w0_shift] && !wireIsBad[w1_shift] && !wireIsBad[ref_shift]) {
           n_regions_checked++;
           v_cands_shift  = FindCandidates(ic, w0_shift, w1_shift, false, nclusts_inwindow_shift);
         }
@@ -632,12 +628,7 @@
         ref_shift = refwire - shift;
         w0_shift = w0 - shift;
         w1_shift = w1 - shift;
-  		  if( 
-          //    std::find(fBadWires.begin(), fBadWires.end(), w0_shift ) == fBadWires.end() 
-          //&&  std::find(fBadWires.begin(), fBadWires.end(), w1_shift ) == fBadWires.end() 
-          //&&  std::find(fBadWires.begin(), fBadWires.end(), ref_shift ) == fBadWires.end() 
-          !wireIsBad[w0_shift] && !wireIsBad[w1_shift] && !wireIsBad[ref_shift]
-        ) {
+  		  if( !wireIsBad[w0_shift] && !wireIsBad[w1_shift] && !wireIsBad[ref_shift]) {
           n_regions_checked++;
           v_cands_shift2  = FindCandidates(ic, w0_shift, w1_shift, false, nclusts_inwindow_shift2);
         }
@@ -661,7 +652,7 @@
           if( thisCand.dT > 6.25 && thisCand.dT < 312.5 ) {
             _numBiPo_6_312++;
             if( clust_isBeta[ic] ) _numBiPo_6_312_true++;
-            h_timeFine_vs_rate  ->Fill(eventHour);
+            h_timeFine_vs_rate  ->Fill(eventHr);
           }
           if( thisCand.dT >= fdT_min ) {
             _numBiPo++;
@@ -669,7 +660,7 @@
             h_beta_charge         ->Fill(thisCand.q1);
             h_alpha_charge        ->Fill(thisCand.q2);
             h_cand_dT             ->Fill(thisCand.dT);
-            h_2D_time_vs_dT       ->Fill(eventHour,thisCand.dT);
+            h_2D_time_vs_dT       ->Fill(eventHr,thisCand.dT);
             //h_poszy[eventTimeBin] ->Fill(blip_z[thisCand.blipID],blip_y[thisCand.blipID]);
           }
 
@@ -688,7 +679,7 @@
               h_beta_charge_shift         ->Fill(thisCand.q1,weight);
               h_alpha_charge_shift        ->Fill(thisCand.q2,weight);
               h_cand_dT_shift             ->Fill(thisCand.dT, weight);
-              h_2D_time_vs_dT_shift       ->Fill(eventHour,thisCand.dT, weight);
+              h_2D_time_vs_dT_shift       ->Fill(eventHr,thisCand.dT, weight);
               //h_poszy_shift[eventTimeBin] ->Fill(blip_z[thisCand.blipID],blip_y[thisCand.blipID]);
             }
           }//endloop over candidates
@@ -700,7 +691,7 @@
               h_beta_charge_shift       ->Fill(thisCand.q1,weight);
               h_alpha_charge_shift      ->Fill(thisCand.q2,weight);
               h_cand_dT_shift           ->Fill(thisCand.dT, weight);
-              h_2D_time_vs_dT_shift     ->Fill(eventHour,thisCand.dT, weight);
+              h_2D_time_vs_dT_shift     ->Fill(eventHr,thisCand.dT, weight);
               //h_poszy_sub[eventTimeBin] ->Fill(blip_z[thisCand.blipID],blip_y[thisCand.blipID]);
             }
           }//endloop over candidates
@@ -740,7 +731,7 @@
       //      if( blipid >= 0 ) _blipAvailable[blipid] = false;
       //      if( thisCand.dT > 6.25 && thisCand.dT < 312.5 ) {
       //        _numBiPo_6_312++;
-      //        h_timeFine_vs_rate  ->Fill(eventHour);
+      //        h_timeFine_vs_rate  ->Fill(eventHr);
       //      }
       //      if( thisCand.dT > fdT_min ) {
       //        _numBiPo++;
@@ -748,7 +739,7 @@
       //        h_alpha_charge      ->Fill(thisCand.q2);
       //        h_alpha_nhits       ->Fill(clust_nhits[thisCand.id2]);
       //        h_cand_dT           ->Fill(thisCand.dT);
-      //        h_2D_time_vs_dT        ->Fill(eventHour,thisCand.dT);
+      //        h_2D_time_vs_dT        ->Fill(eventHr,thisCand.dT);
       //        //if( thisCand.dT > 10 && thisCand.dT < 20 ) {
       //        //  std::cout
       //        //  <<"Found a weird one! dT "<<thisCand.dT
@@ -770,7 +761,7 @@
       //        h_beta_charge_shift  ->Fill(thisCand.q1,weight);
       //        h_alpha_charge_shift ->Fill(thisCand.q2,weight);
       //        h_cand_dT_shift      ->Fill(thisCand.dT,weight);
-      //        h_2D_time_vs_dT_shift ->Fill(eventHour,thisCand.dT,weight);
+      //        h_2D_time_vs_dT_shift ->Fill(eventHr,thisCand.dT,weight);
       //      }
       //  }//end evaluation of dT-shift candidates
 
@@ -802,7 +793,6 @@
     h_alpha_charge_sub->Add(h_alpha_charge, 1);
     h_beta_charge_sub->Add(h_beta_charge, 1);
 
-  
     h_cand_dT_sub     ->Add(h_cand_dT_shift,     -1.);
     h_2D_time_vs_dT_sub  ->Add(h_2D_time_vs_dT_shift,  -1.);
     h_alpha_charge_sub->Add(h_alpha_charge_shift,-1.);

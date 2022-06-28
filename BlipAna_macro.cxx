@@ -9,7 +9,7 @@
 
 
 // General macro parameters
-std::string   fFileName     = "BlipAna_Eminus_0to5MeV_Overlay_WMF_20220610.root";
+std::string   fFileName     = "BlipAna_20220627_Eminus_0to5MeV_Overlay_Standard.root";
 std::string   fTreeName     = "blipana/anatree";
 float         thresh_emax   = 3.0; // MeV
 int           thresh_ebins  = 30; // # bins
