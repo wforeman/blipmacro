@@ -41,7 +41,7 @@
   bool  fAlphaReq3D       = false;  // Require alpha pulse be 3D-matched
   float fdT_binSize       = 20.;    // Bin width for all dT spectra plots [us]
   float fdT_min           = 20.;    // Min dT for looking for candidate [us]
-  float fdT_max           = 300.;   // Max dT for looking for candidate [us]
+  float fdT_max           = 500.;   // Max dT for looking for candidate [us]
   int   fMaxClustMult     = 999;    // Max number of clusters in time window
   float fSphereRadius     = 25;    
   bool  fFidVolCut        = false;
@@ -97,7 +97,8 @@
   //#######################################################################
   // Derived parameters
   //######################################################################
-  
+ 
+
   // Fiducial vol correction factor
   float dz = fZmax-fZmin;
   float dy = fYmax-fYmin;
@@ -110,11 +111,12 @@
   int   _numBiPo_true   = 0;
   int   _numBiPo_6_312_true = 0;
   float _totalLiveTime  = 0;
+  int   _nwires         = 3456;
   std::vector<bool> _blipAvailable;
   std::vector<bool> _clustAvailable;
   std::map<int,std::vector<int>> _map_wire_clusters;
-  std::vector<bool> wireIsNoisy (3456,false);
-  std::vector<bool> wireIsBad   (3456,false);
+  std::vector<bool> wireIsNoisy (_nwires,false);
+  std::vector<bool> wireIsBad   (_nwires,false);
 
   // Live time
   int   _minTick         = 0;
@@ -140,6 +142,8 @@
   void                        makePlots();
   void                        makeHistograms();
   std::vector<BiPoCandidate>  FindCandidates(int, int, int, bool, int&);
+  std::vector<BiPoCandidate>  FindCandidates(int, int, bool, int&, int&);
+  //std::vector<BiPoCandidate>  FindCandidatesShift(int, int&);
   std::vector<BiPoCandidate>  FindCandidatesCluster(int, bool, int&, int&);
   FitResult                   fitdT(TH1D*,bool);
   int                         FindG4Index(int);
@@ -393,10 +397,10 @@
     } 
   
     if( fBackgroundMode == 1 ) _minTick = (int)fdT_max*2;
+    _liveTimePerEvt  = (_maxTick-_minTick)*fSamplePeriod*1e-6; //sec
 
     // Keep list of cluster counts per wire/channel
     std::map<int,int> map_wn;
-    //std::map<int,int> map_chn;
     
     // Print-interval counter
     int print_counter = 0;
@@ -487,7 +491,9 @@
       _map_wire_clusters.clear();
       for(int i=0; i < nclusts; i++){
         if( clust_plane[i] != 2 ) continue;
-        _map_wire_clusters[clust_wire[i]].push_back(i);
+        for(int j=clust_startwire[i]; j<=clust_endwire[i]; j++)
+          _map_wire_clusters[clust_wire[i]].push_back(i);
+        
         map_wn[clust_wire[i]] += 1;
         h_wt_clusts->Fill(clust_wire[i],clust_time[i]);
       }
@@ -537,8 +543,8 @@
   			// skip if any wire in cluster is from a noisy wire
         // skip if this cluster is at the very edge of the wireplane
         int w_start = std::max(0,clust_startwire[ic]-1);
-        int w_end   = std::min(clust_endwire[ic]+1,(int)wireIsNoisy.size()-1);
-        if( w_start < 10 || w_end > int(wireIsNoisy.size()-10) ) continue;
+        int w_end   = std::min(clust_endwire[ic]+1,(int)_nwires-1);
+        if( w_start < 10 || w_end > int(_nwires-10) ) continue;
         for(int iwire = w_start; iwire <= w_end; iwire++)
           if( wireIsNoisy[iwire] || wireIsBad[iwire] ) continue;
 
@@ -610,23 +616,25 @@
         int nclusts_inwindow        = 0;
         int nclusts_inwindow_shift  = 0;
         int nclusts_inwindow_shift2  = 0;
- 
-        
 
-
+        /*
         // assign wire range
         int refwire = clust_wire[ic] + fRandomWireShift;
         if ( refwire < 0  || refwire > nWiresColl ) 
           refwire = clust_wire[ic] - fRandomWireShift;
         int w0  = refwire - fWireRange;
         int w1  = refwire + fWireRange;
-        
+        */
+
         // -------------------------------------------
         // Search for standard candidates
-        std::vector<BiPoCandidate> v_cands = FindCandidates(ic, w0, w1, false, nclusts_inwindow);
+        //std::vector<BiPoCandidate> v_cands = FindCandidates(ic, w0, w1, false, nclusts_inwindow);
+        int nwires = 0;
+        std::vector<BiPoCandidate> v_cands = FindCandidates(ic, 0, false, nclusts_inwindow,nwires);
         h_nclusts_inwindow->Fill(nclusts_inwindow);
         h_ncands_inwindow->Fill((int)v_cands.size());
-  
+        
+        /*
         // -------------------------------------------
         // Search for background candidates (wire shift)
         int shift = 2*fWireRange+1;
@@ -656,17 +664,25 @@
           n_regions_checked++;
           v_cands_shift2  = FindCandidates(ic, w0_shift, w1_shift, false, nclusts_inwindow_shift2);
         }
+        */
+        int nwires_shift = 0;
+        int shift = 2*fWireRange+1;
+        std::vector<BiPoCandidate> v_cands_shift = FindCandidates(ic,shift,false,nclusts_inwindow_shift,nwires_shift);
+
 
         // ------------------------------------------------------------
         // Search for background candidates (same wire, but dT-flip)
         int nclusts_inwindow_flip;
-        std::vector<BiPoCandidate> v_cands_flip = FindCandidates(ic, w0, w1, true, nclusts_inwindow_flip);
-
+        int nwires_flip = 0;
+        //std::vector<BiPoCandidate> v_cands_flip = FindCandidates(ic, w0, w1, true, nclusts_inwindow_flip);
+        std::vector<BiPoCandidate> v_cands_flip = FindCandidates(ic, 0, true, nclusts_inwindow_flip,nwires_flip);
+      
         // --------------------------------------------
         // Evaluate standard candidates
         // ---------------------------------------------
+
         if( v_cands.size()==1 && nclusts_inwindow <=  fMaxClustMult ) {
-          
+        
           auto& thisCand = v_cands.at(0);
           
           // plot locations
@@ -700,13 +716,14 @@
         // --------------------------------------------
         // Evaluate wire shift candidates
         // ---------------------------------------------
-        float weight = 1./float(n_regions_checked);
+        //float weight = 1./float(n_regions_checked);
         //std::cout<<"applying weight "<<weight<<" to background\n";
+        float weight = nwires/float(nwires_shift);
         if( v_cands_shift.size() && v_cands_shift.size() <= fMaxCandidates && nclusts_inwindow_shift <=  fMaxClustMult ) {
           for(auto& thisCand : v_cands_shift ) {
             if( thisCand.dT >= fdT_min ) {
-              h_cand_dT_shift             ->Fill(thisCand.dT, weight);
-              h_2D_time_vs_dT_shift       ->Fill(eventHr,thisCand.dT, weight);
+              h_cand_dT_shift             ->Fill(thisCand.dT,weight);
+              h_2D_time_vs_dT_shift       ->Fill(eventHr,thisCand.dT,weight);
               if( fBackgroundMode == 0 ) {
                 h_beta_charge_bg         ->Fill(thisCand.q1,weight);
                 h_alpha_charge_bg        ->Fill(thisCand.q2,weight);
@@ -715,6 +732,7 @@
           }//endloop over candidates
         }//end evaluation of wire-shift candidates
         
+        /*
         if( v_cands_shift2.size() && v_cands_shift2.size() <= fMaxCandidates && nclusts_inwindow_shift2 <=  fMaxClustMult ) {
           for(auto& thisCand : v_cands_shift2 ) {
             if( thisCand.dT >= fdT_min ) {
@@ -728,7 +746,7 @@
             }
           }//endloop over candidates
         }//end evaluation of wire-shift candidates
-        
+        */
 
         // --------------------------------------------
         // Evaluate dT-flip candidates
@@ -876,6 +894,7 @@
     printf("dT min/max          : %.2f-%.2f us\n",  fdT_min,fdT_max);
     printf("Ave cands / evt     : %f (%f in 6.25-312.us)\n",h_cand_dT->GetEntries()/(float)_numEvents, _numBiPo_6_312/(float)_numEvents );
     printf("  - truth-matched   : %f (%f in 6.25-312.us)\n",_numBiPo_true/(float)_numEvents, _numBiPo_6_312_true/(float)_numEvents );
+    printf("BG subtrctn method  : %i\n",fBackgroundMode);
     printf("Processing time     : %f sec/evt\n", loopDuration/float(_numEvents));
     printf("Excluding %i noisy wires \n",     (int)fNoisyWires.size());	
     printf("*******************************************\n\n");
@@ -1094,6 +1113,7 @@
     
     //std::cout<<"Searching for cands: "<<(int)flipdT<<"   "<<start<<"-"<<end<<"\n";
     std::vector<BiPoCandidate> v;
+    std::vector<int> cand_IDs;
     npileup = 0;
     
     for(int iWire = start; iWire <= end; iWire++){
@@ -1101,7 +1121,8 @@
       for(auto& jc : _map_wire_clusters[iWire] ) {
         if( ic == jc ) continue;
         if( !_clustAvailable[jc] ) continue;
-        
+        if( std::count(cand_IDs.begin(),cand_IDs.end(),jc) ) continue;
+
         //... temporary ... 
         //exclude electrons
         //int eid = clust_edepid[jc];
@@ -1123,7 +1144,6 @@
         // Count clusters in forward window, and fill some pre-cut histos
   
         if( dT > 0 && dT < fdT_max ) {
-          //std::cout<<" dt "<<dT<<"**************************************************************************\n";
           npileup++;
         
             // --- alpha charge/nhits cut ---
@@ -1134,6 +1154,92 @@
               int blipID = clust_blipid[ic];
               BiPoCandidate c = { blipID, ic, jc, dT, clust_charge[ic], clust_charge[jc]};
               v.push_back(c);
+              cand_IDs.push_back(jc);
+            }
+          
+         
+        } 
+  
+      }//<-- end loop over clusters on this wire
+    }//endloop over wires
+  
+    return v;
+  
+  }
+  
+
+
+  std::vector<BiPoCandidate> FindCandidates(int ic, int wire_shift, bool flipdT, int& npileup, int& nwires ) {
+    
+    //std::cout<<"Searching for cands: "<<(int)flipdT<<"   "<<start<<"-"<<end<<"\n";
+    std::vector<BiPoCandidate> v;
+    std::vector<int> cand_IDs;
+    npileup = 0;
+    
+    int w_start = clust_startwire[ic] - wire_shift;
+    int w_end   = clust_endwire[ic] + wire_shift;
+
+    std::set<int> wires;
+
+    for(int i=w_start-fWireRange; i<=w_start+fWireRange; i++)
+      wires.insert(i);
+
+    if( clust_startwire[ic] != clust_endwire[ic] ) {
+    
+      for(int i=w_end-fWireRange; i<w_end+fWireRange; i++)
+        wires.insert(i);
+    }
+
+    nwires = wires.size();
+
+    for(auto iWire : wires ) {
+    
+      for(auto& jc : _map_wire_clusters[iWire] ) {
+        if( ic == jc ) continue;
+        if( !_clustAvailable[jc] ) continue;
+        if( std::count(cand_IDs.begin(),cand_IDs.end(),jc) ) continue;
+
+        //... temporary ... 
+        //exclude electrons
+        //int eid = clust_edepid[jc];
+        //if( eid >= 0 ) {
+        //  //std::cout<<"Found an alpha cand that is matched "<<eid<<"   pdg "<<edep_pdg[eid]<<"\n";
+        //  if( fabs(edep_pdg[eid]) == 11 ) continue;
+        //}
+        //
+        
+
+        // 
+        float dT  = (clust_time[jc]-clust_time[ic])*fSamplePeriod;
+        
+        // use drift velocity to convert wire offset to 'time'
+        // and create a 2D point
+
+
+        //std::cout<<"   clust "<<jc<<" has dT "<<dT<<"\n";
+        
+        if (flipdT) {
+          dT *= -1.;
+          //std::cout<<"      flipped: "<<dT<<"\n";
+        }
+
+        // 3D plane-match requirement for alpha
+        if( fAlphaReq3D && clust_blipid[jc] < 0 ) continue;
+        
+        // Count clusters in forward window, and fill some pre-cut histos
+  
+        if( dT > 0 && dT < fdT_max ) {
+          npileup++;
+        
+            // --- alpha charge/nhits cut ---
+            if(   clust_charge[jc] > fAlphaCharge_min 
+              &&  clust_charge[jc] < fAlphaCharge_max 
+              &&  clust_nhits[jc] <= fAlphaHits_max ) {
+              
+              int blipID = clust_blipid[ic];
+              BiPoCandidate c = { blipID, ic, jc, dT, clust_charge[ic], clust_charge[jc]};
+              v.push_back(c);
+              cand_IDs.push_back(jc);
             }
           
          
