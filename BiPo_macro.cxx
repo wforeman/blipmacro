@@ -27,19 +27,21 @@
   unsigned int fT1[3] = {  0, 1627592728, 1627761265 };
   //                            Phase 1     Phase 2
   //                            ~49.3 hrs   ~46.4 hrs
+  
 
   // --- General macro parameters ---
+  int   fBackgroundMode   = 1;      // 0= wire-shift, 1= dT-flip
   bool  fPickyBlipMode    = false;  // Require blips match on all 3 planes
   int   fWireRange        = 1;      // +/- range to look for alpha candidate
   float fBetaCharge_min   = 3.5e3;  // Min charge of beta candidate blip [e-]
-  float fBetaCharge_max   = 80e3;   // Max charge of beta candidate blip [e-]
+  float fBetaCharge_max   = 100e3;   // Max charge of beta candidate blip [e-]
   float fAlphaCharge_min  = 0e3;    // Min charge of alpha candidate cluster [e-]
   float fAlphaCharge_max  = 8e3;    // Max charge of alpha candidate cluster [e-]
   int   fAlphaHits_max    = 2;      // Max hits in alpha candidate cluster
   bool  fAlphaReq3D       = false;  // Require alpha pulse be 3D-matched
   float fdT_binSize       = 20.;    // Bin width for all dT spectra plots [us]
   float fdT_min           = 20.;    // Min dT for looking for candidate [us]
-  float fdT_max           = 800.;   // Max dT for looking for candidate [us]
+  float fdT_max           = 300.;   // Max dT for looking for candidate [us]
   int   fMaxClustMult     = 999;    // Max number of clusters in time window
   float fSphereRadius     = 25;    
   bool  fFidVolCut        = false;
@@ -115,6 +117,7 @@
   std::vector<bool> wireIsBad   (3456,false);
 
   // Live time
+  int   _minTick         = 0;
   int   _maxTick         = 6400 - (int)fdT_max*2;
   float _liveTimePerEvt  = _maxTick*fSamplePeriod*1e-6; //sec
   
@@ -156,6 +159,7 @@
   TH1D* h_ncands_inwindow;
   TH1D* h_cand_dT;
   TH1D* h_cand_dT_shift;
+  TH1D* h_cand_dT_flip;
   TH1D* h_cand_dT_sub;
   //TH1D* h_clust_dT;
   TH1D* h_hit_gof_2D;
@@ -179,6 +183,7 @@
   
   TH2D* h_2D_time_vs_dT;       // dT for candidate region
   TH2D* h_2D_time_vs_dT_shift;
+  TH2D* h_2D_time_vs_dT_flip;
   TH2D* h_2D_time_vs_dT_sub;
 
   TH1D* h_time_vs_rate_bipo; 
@@ -193,10 +198,12 @@
   //TH2D* h_time_vs_trklen;
   
   TH1D* h_alpha_charge;
-  TH1D* h_alpha_charge_shift;
+  //TH1D* h_alpha_charge_shift;
+  TH1D* h_alpha_charge_bg;
   TH1D* h_alpha_charge_sub;
   TH1D* h_beta_charge;
-  TH1D* h_beta_charge_shift;
+  //TH1D* h_beta_charge_shift;
+  TH1D* h_beta_charge_bg;
   TH1D* h_beta_charge_sub;
 
   const int timeBins = 9;
@@ -257,19 +264,22 @@
     int dTbins = fdT_max / fdT_binSize;
     h_cand_dT       = new TH1D("cand_dT","Selected BiPo Candidates;Time difference [#mus];Candidates per readout", dTbins,0,fdT_max);
     h_cand_dT_shift = (TH1D*)h_cand_dT->Clone("cand_dT_shift"); h_cand_dT_shift ->SetTitle("Shifted-wire region candidates");
+    h_cand_dT_flip  = (TH1D*)h_cand_dT->Clone("cand_dT_flip");  h_cand_dT_flip  ->SetTitle("Opposite dT candidates");
     h_cand_dT_sub   = (TH1D*)h_cand_dT->Clone("cand_dT_sub");   h_cand_dT_sub   ->SetTitle("Background-subtracted spectrum");
     
     float alphaQmax = 8e3;
     int   alphaQbins = 40;
     h_alpha_charge      = new TH1D("alpha_charge","Candidate alphas;Collection Plane Charge [e];Events", alphaQbins, 0, alphaQmax);
-    h_alpha_charge_shift = (TH1D*)h_alpha_charge->Clone("alpha_charge_shift");
+    //h_alpha_charge_shift = (TH1D*)h_alpha_charge->Clone("alpha_charge_shift");
+    h_alpha_charge_bg   = (TH1D*)h_alpha_charge->Clone("alpha_charge_bg");
     h_alpha_charge_sub = (TH1D*)h_alpha_charge->Clone("alpha_charge_sub");
     h_alpha_charge_sub  ->SetTitle("Candidate alphas after background subtraction");
     
-    float betaQmax = 80e3;
-    int   betaQbins = 40;
+    float betaQmax = 100e3;
+    int   betaQbins = 50;
     h_beta_charge      = new TH1D("beta_charge","Candidate betas;Collection Plane Charge [e];Events", betaQbins, 0, betaQmax);
-    h_beta_charge_shift = (TH1D*)h_beta_charge->Clone("beta_charge_shift");
+    //h_beta_charge_shift = (TH1D*)h_beta_charge->Clone("beta_charge_shift");
+    h_beta_charge_bg = (TH1D*)h_beta_charge->Clone("beta_charge_bg");
     h_beta_charge_sub = (TH1D*)h_beta_charge->Clone("beta_charge_sub");
     h_beta_charge_sub  ->SetTitle("Candidate betas after background subtraction");
     
@@ -300,6 +310,7 @@
     tdir_util->cd();
     h_2D_time_vs_dT      = new TH2D("2D_time_vs_dT",";Event time [hr];Time difference [#mus]",timeBins,0,timeMax, dTbins,0,fdT_max);
     h_2D_time_vs_dT_shift= (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_shift");
+    h_2D_time_vs_dT_flip= (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_flip");
     h_2D_time_vs_dT_sub  = (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_sub");
     h_time_vs_N       = new TH1D("time_vs_N",";Event time [hr];Number of entries into dT plot",timeBins,0,timeMax);
     h_time_vs_ratio     = (TH1D*)h_time_vs_rate_bipo->Clone("time_vs_ratio");
@@ -380,6 +391,8 @@
       _betaMinPlanes    = 3;      // Min number of matched planes (must be 2 or 3)
       _betaMaxDiff      = 2;      // Difference in wire intersection points [cm]
     } 
+  
+    if( fBackgroundMode == 1 ) _minTick = (int)fdT_max*2;
 
     // Keep list of cluster counts per wire/channel
     std::map<int,int> map_wn;
@@ -574,7 +587,15 @@
         float peakT = clust_time[ic]+800;
         if( peakT < 0 ) continue;
         if( peakT > _maxTick ) continue;
+        if( peakT < _minTick ) continue; 
         
+        // New method: check start and end wire separate; background regions are
+        // now the wire on the far side of either one
+
+
+
+
+
 
 
         //####################################################################
@@ -589,7 +610,10 @@
         int nclusts_inwindow        = 0;
         int nclusts_inwindow_shift  = 0;
         int nclusts_inwindow_shift2  = 0;
-  
+ 
+        
+
+
         // assign wire range
         int refwire = clust_wire[ic] + fRandomWireShift;
         if ( refwire < 0  || refwire > nWiresColl ) 
@@ -633,6 +657,11 @@
           v_cands_shift2  = FindCandidates(ic, w0_shift, w1_shift, false, nclusts_inwindow_shift2);
         }
 
+        // ------------------------------------------------------------
+        // Search for background candidates (same wire, but dT-flip)
+        int nclusts_inwindow_flip;
+        std::vector<BiPoCandidate> v_cands_flip = FindCandidates(ic, w0, w1, true, nclusts_inwindow_flip);
+
         // --------------------------------------------
         // Evaluate standard candidates
         // ---------------------------------------------
@@ -669,18 +698,19 @@
   
   
         // --------------------------------------------
-        // Evaluate dT-shift candidates
+        // Evaluate wire shift candidates
         // ---------------------------------------------
         float weight = 1./float(n_regions_checked);
         //std::cout<<"applying weight "<<weight<<" to background\n";
         if( v_cands_shift.size() && v_cands_shift.size() <= fMaxCandidates && nclusts_inwindow_shift <=  fMaxClustMult ) {
           for(auto& thisCand : v_cands_shift ) {
             if( thisCand.dT >= fdT_min ) {
-              h_beta_charge_shift         ->Fill(thisCand.q1,weight);
-              h_alpha_charge_shift        ->Fill(thisCand.q2,weight);
               h_cand_dT_shift             ->Fill(thisCand.dT, weight);
               h_2D_time_vs_dT_shift       ->Fill(eventHr,thisCand.dT, weight);
-              //h_poszy_shift[eventTimeBin] ->Fill(blip_z[thisCand.blipID],blip_y[thisCand.blipID]);
+              if( fBackgroundMode == 0 ) {
+                h_beta_charge_bg         ->Fill(thisCand.q1,weight);
+                h_alpha_charge_bg        ->Fill(thisCand.q2,weight);
+              }
             }
           }//endloop over candidates
         }//end evaluation of wire-shift candidates
@@ -688,15 +718,36 @@
         if( v_cands_shift2.size() && v_cands_shift2.size() <= fMaxCandidates && nclusts_inwindow_shift2 <=  fMaxClustMult ) {
           for(auto& thisCand : v_cands_shift2 ) {
             if( thisCand.dT >= fdT_min ) {
-              h_beta_charge_shift       ->Fill(thisCand.q1,weight);
-              h_alpha_charge_shift      ->Fill(thisCand.q2,weight);
               h_cand_dT_shift           ->Fill(thisCand.dT, weight);
               h_2D_time_vs_dT_shift     ->Fill(eventHr,thisCand.dT, weight);
+              if( fBackgroundMode == 0 ) {
+                h_beta_charge_bg         ->Fill(thisCand.q1,weight);
+                h_alpha_charge_bg        ->Fill(thisCand.q2,weight);
+              }
               //h_poszy_sub[eventTimeBin] ->Fill(blip_z[thisCand.blipID],blip_y[thisCand.blipID]);
             }
           }//endloop over candidates
         }//end evaluation of wire-shift candidates
-      
+        
+
+        // --------------------------------------------
+        // Evaluate dT-flip candidates
+        // ---------------------------------------------
+        if( v_cands_flip.size() && v_cands_flip.size() <= fMaxCandidates && nclusts_inwindow_flip <=  fMaxClustMult ) {
+          for(auto& thisCand : v_cands_flip ) {
+            if( thisCand.dT >= fdT_min ) {
+              h_cand_dT_flip             ->Fill(thisCand.dT);
+              h_2D_time_vs_dT_flip       ->Fill(eventHr,thisCand.dT);
+              if( fBackgroundMode == 1 ) {
+                h_beta_charge_bg       ->Fill(thisCand.q1);
+                h_alpha_charge_bg        ->Fill(thisCand.q2);
+              }
+            }
+          }//endloop over candidates
+        }//end evaluation of dt-flip candidates
+     
+
+
         //#######################################################################################################
 
 
@@ -782,6 +833,7 @@
     //h_clust_dT        ->Scale( scaleFact );
     h_cand_dT         ->Scale( scaleFact );
     h_cand_dT_shift   ->Scale( scaleFact );
+    h_cand_dT_flip    ->Scale( scaleFact );
     h_timeFine_vs_rate->Divide( h_timeFine_vs_evts );
 
     
@@ -792,11 +844,18 @@
     h_2D_time_vs_dT_sub  ->Add(h_2D_time_vs_dT,   1);
     h_alpha_charge_sub->Add(h_alpha_charge, 1);
     h_beta_charge_sub->Add(h_beta_charge, 1);
+    
+    if( fBackgroundMode == 0 ) {
+      h_cand_dT_sub       ->Add(h_cand_dT_shift,     -1.);
+      h_2D_time_vs_dT_sub ->Add(h_2D_time_vs_dT_shift,  -1.);
+    } else
+    if( fBackgroundMode == 1 ) {
+      h_cand_dT_sub       ->Add(h_cand_dT_flip,     -1.);
+      h_2D_time_vs_dT_sub ->Add(h_2D_time_vs_dT_flip,  -1.);
+    }
 
-    h_cand_dT_sub     ->Add(h_cand_dT_shift,     -1.);
-    h_2D_time_vs_dT_sub  ->Add(h_2D_time_vs_dT_shift,  -1.);
-    h_alpha_charge_sub->Add(h_alpha_charge_shift,-1.);
-    h_beta_charge_sub->Add(h_beta_charge_shift,-1.);
+    h_alpha_charge_sub->Add(h_alpha_charge_bg,-1.);
+    h_beta_charge_sub->Add(h_beta_charge_bg,-1.);
     
     //for(int i=0; i<timeBins; i++){
       //h_poszy_sub[i]->Add(h_poszy[i],1);
@@ -1032,7 +1091,8 @@
   // Function to search for alpha candidates relative to a beta candidate
   //#################################################################################
   std::vector<BiPoCandidate> FindCandidates(int ic, int start, int end, bool flipdT, int& npileup ) {
-        
+    
+    //std::cout<<"Searching for cands: "<<(int)flipdT<<"   "<<start<<"-"<<end<<"\n";
     std::vector<BiPoCandidate> v;
     npileup = 0;
     
@@ -1044,20 +1104,26 @@
         
         //... temporary ... 
         //exclude electrons
-        int eid = clust_edepid[jc];
-        if( eid >= 0 ) {
-          //std::cout<<"Found an alpha cand that is matched "<<eid<<"   pdg "<<edep_pdg[eid]<<"\n";
-          if( fabs(edep_pdg[eid]) == 11 ) continue;
-        }
+        //int eid = clust_edepid[jc];
+        //if( eid >= 0 ) {
+        //  //std::cout<<"Found an alpha cand that is matched "<<eid<<"   pdg "<<edep_pdg[eid]<<"\n";
+        //  if( fabs(edep_pdg[eid]) == 11 ) continue;
+        //}
         float dT  = (clust_time[jc]-clust_time[ic])*fSamplePeriod;
-       
+        //std::cout<<"   clust "<<jc<<" has dT "<<dT<<"\n";
+        
+        if (flipdT) {
+          dT *= -1.;
+          //std::cout<<"      flipped: "<<dT<<"\n";
+        }
+
         // 3D plane-match requirement for alpha
         if( fAlphaReq3D && clust_blipid[jc] < 0 ) continue;
         
         // Count clusters in forward window, and fill some pre-cut histos
-        if (flipdT) dT *= -1.;
   
-        if( dT > 0 && fabs(dT) < fdT_max ) {
+        if( dT > 0 && dT < fdT_max ) {
+          //std::cout<<" dt "<<dT<<"**************************************************************************\n";
           npileup++;
         
             // --- alpha charge/nhits cut ---
@@ -1066,7 +1132,7 @@
               &&  clust_nhits[jc] <= fAlphaHits_max ) {
               
               int blipID = clust_blipid[ic];
-              BiPoCandidate c = { blipID, ic, jc, fabs(dT), clust_charge[ic], clust_charge[jc]};
+              BiPoCandidate c = { blipID, ic, jc, dT, clust_charge[ic], clust_charge[jc]};
               v.push_back(c);
             }
           
