@@ -4,16 +4,41 @@
 #include "TH2D.h"
 #include "TStyle.h"
 #include "TLine.h"
+#include <utility>
 
 // ######################################################################
 // Various tools and algorithms to make life easier
 
 float GetHistMax(TH1D* h) {
-  return h->GetBinContent(h->GetMaximumBin() );
+  float max = h->GetBinContent(h->GetMaximumBin() );
+  for(int i=1; i<=h->GetXaxis()->GetNbins(); i++){
+    float v = h->GetBinContent(i)+h->GetBinError(i);
+    max = ( v > max )? v : max;
+  }
+  return max;
 }
 
 float GetHistMin(TH1D* h) {
-  return h->GetBinContent(h->GetMinimumBin() );
+  float min = h->GetBinContent(h->GetMinimumBin() );
+  for(int i=1; i<=h->GetXaxis()->GetNbins(); i++){
+    float v = h->GetBinContent(i)-h->GetBinError(i);
+    min = ( v < min )? v : min;
+  }
+  return min;
+}
+
+
+std::pair<float,float> GetHistLimits(TH1D* h) {
+  float max = h->GetBinContent(h->GetMaximumBin() );
+  float min = h->GetBinContent(h->GetMinimumBin() );
+  for(int i=1; i<=h->GetXaxis()->GetNbins(); i++){
+    float v = h->GetBinContent(i)+h->GetBinError(i);
+    max = ( v > max )? v : max;
+    min = ( v < min )? v : min;
+  }
+  std::pair<float,float> out(min,max);
+  return out;
+
 }
 
 void AddTextLine(TLatex* t, float x, float y, int lineNum, std::string line){
@@ -125,10 +150,10 @@ void FormatTH1D(TH1D* h, Color_t lc, int ls, int lwidth){
   h->SetLineWidth(lwidth);
 }
 
-void FormatTH1D(TH1D* h, Color_t lc, int ls, int lwidth, int ms, double msize){
-  FormatTH1D(h, lc, ls, lwidth);
-  h->SetMarkerColor(lc);
-  h->SetMarkerStyle(ms);
+void FormatTH1D(TH1D* h, Color_t lcolor, int lstyle, int lwidth, int mstyle, double msize){
+  FormatTH1D(h, lcolor, lstyle, lwidth);
+  h->SetMarkerColor(lcolor);
+  h->SetMarkerStyle(mstyle);
   h->SetMarkerSize(msize);
 }
 
@@ -268,11 +293,12 @@ TH1D* Make1DSlice(const TH2D* h2d, int bin1, int bin2, std::string name)
   float nbins = h2d->GetYaxis()->GetNbins();
   float xmin = h2d->GetYaxis()->GetXmin();
   float xmax = h2d->GetYaxis()->GetXmax();
-  float mean = (h2d->GetXaxis()->GetBinCenter(bin1) + h2d->GetXaxis()->GetBinCenter(bin2))/2.;
+  float mean = 0.5*(h2d->GetXaxis()->GetBinCenter(bin1) + h2d->GetXaxis()->GetBinCenter(bin2));
   name = Form("%s_%d_%d",name.c_str(),bin1,bin2);
+  
   TH1D* h = new TH1D(name.c_str(),Form("1D slice: bins %d-%d (x= %f)",bin1,bin2,mean),nbins,xmin,xmax);
 
-  for(int j=1; j<nbins; j++){
+  for(int j=1; j<=nbins; j++){
     float sum_bc = 0;
     float sum_sqErr = 0;
     for(int i=bin1; i<=bin2; i++){

@@ -7,7 +7,7 @@
   #include "core/vars.h"
   #include "core/tools.h"
   
-  std::string fFileName     = "BlipAna_RadonData_Phase1_20220610.root";
+  std::string fFileName     = "BlipAna_RadonData_Phase1_20220710.root";
   std::string fTreeName     = "blipanaTrkMask/anatree";
   std::string fOutFileName  = "output/plots_wirediagnostics_" + fFileName;
   

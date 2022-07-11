@@ -9,7 +9,7 @@
 
 
 // General macro parameters
-std::string   fFileName     = "BlipAna_20220627_Eminus_0to5MeV_Overlay_Standard.root";
+std::string   fFileName     = "BlipAna_20220710_Eminus_0to5MeV_Overlay_WMF2.root";
 std::string   fTreeName     = "blipana/anatree";
 float         thresh_emax   = 3.0; // MeV
 int           thresh_ebins  = 30; // # bins
@@ -182,7 +182,7 @@ void BlipAna_macro(){
         // clusters within it, and all clusters match to the same true particle
         bool isGood = true;
         for(size_t ipl = 0; ipl < kNplanes; ipl++){
-          if( blip_clustid[ipl][i] <= 0 ) continue;
+          if( blip_clustid[ipl][i] < 0 ) continue;
           int clust_eid = clust_edepid[blip_clustid[ipl][i]];
           if( clust_eid != eid ) {
             isGood = false;

@@ -4,30 +4,22 @@
   //
   ////////////////////////////////////////////////////////////////// 
  
-  #include "core/vars.h"
   #include "core/tools.h"
+  #include "core/vars.h"
+  #include "core/bipo.h"
   #include <time.h>
   
   // --- Choose run configuration ---
   int   fConfig   = 2;
-  bool  fIsMC     = false;
   float fMinHr    = 0;
-  float fMaxHr    = 9e9;
-
-  // Filenames 
-  std::string fFileName[3]= { 
-      "BlipAna_20220627_BiPo_MC.root",
-      "BlipAna_20220627_RadonData_Phase1.root",
-      "BlipAna_20220627_RadonData_Phase2.root"
-  };
- 
-
-  // Time periods in UNIX time
-  unsigned int fT0[3] = {  0, 1627415210, 1627594369 };
-  unsigned int fT1[3] = {  0, 1627592728, 1627761265 };
-  //                            Phase 1     Phase 2
-  //                            ~49.3 hrs   ~46.4 hrs
+  float fMaxHr    = 999;
   
+  // --- Input files ---
+  infile_t fInputFiles[3] = {
+    { "BlipAna_20220710_BiPo_Overlay_DefaultQY.root", "blipanaTrkMask/anatree",true,0,0},
+    { "BlipAna_20220710_RadonData_Phase1.root","blipanaTrkMask/anatree",false,1627415210,1627592728},
+    { "BlipAna_20220710_RadonData_Phase2.root","blipanaTrkMask/anatree",false,1627594369,1627761265}
+  };
 
   // --- General macro parameters ---
   int   fBackgroundMode   = 1;      // 0= wire-shift, 1= dT-flip
@@ -49,7 +41,6 @@
   float fZmax             = 985; //1035; //985;    //
   float fYmin             = -80; //-120; //-70;    // Y range (-120 to 120 cm)
   float fYmax             = 80; //120;     //
-  
 
   // --- Detector properties ---
   int   nWiresColl        = 3455;
@@ -105,6 +96,7 @@
   float _fidCorFactor = std::max(1., (1037.*230.) / (dz*dy) );
   
   // Counters / maps / etc
+  bool  _isMC           = false;
   int   _numEvents      = 0;
   int   _numBiPo        = 0;
   int   _numBiPo_6_312  = 0;
@@ -129,21 +121,13 @@
   
   
   //##########################################################################
-  // Structs, functions, histograms
+  // Functions and ROOT objects
   //##########################################################################
-  
-  // Struct to hold fit results
-  struct FitResult { float rate_signal = -9, rate_signal_err = 0, rate_bg = -9, rate_bg_err = 0, ratio = -9; };
-  
-  // useful structure to save candidate info in
-  struct BiPoCandidate { int blipID, id1, id2; float dT, q1, q2; };
-  
-  // Functions 
   void                        makePlots();
   void                        makeHistograms();
+  void                        setRootStyle();
   std::vector<BiPoCandidate>  FindCandidates(int, int, int, bool, int&);
   std::vector<BiPoCandidate>  FindCandidates(int, int, bool, int&, int&);
-  //std::vector<BiPoCandidate>  FindCandidatesShift(int, int&);
   std::vector<BiPoCandidate>  FindCandidatesCluster(int, bool, int&, int&);
   FitResult                   fitdT(TH1D*,bool);
   int                         FindG4Index(int);
@@ -186,47 +170,96 @@
   TH1D* h_time_vs_N;        // basic event count
   
   TH2D* h_2D_time_vs_dT;       // dT for candidate region
-  TH2D* h_2D_time_vs_dT_shift;
-  TH2D* h_2D_time_vs_dT_flip;
-  TH2D* h_2D_time_vs_dT_sub;
+  //TH2D* h_2D_time_vs_dT_shift;
+  //TH2D* h_2D_time_vs_dT_flip;
+  TH2D* h_2D_time_vs_dT_bg;
+  //TH2D* h_2D_time_vs_dT_sub;
 
   TH1D* h_time_vs_rate_bipo; 
+  TH1D* h_time_vs_activity; 
   TH1D* h_time_vs_rate_bg;
   TH1D* h_time_vs_ratio;
  
   TH1D* h_timeFine_vs_evts;
   TH1D* h_timeFine_vs_rate;
   
-  //TH2D* h_time_vs_ph;
   TH2D* h_time_vs_ntrks;
-  //TH2D* h_time_vs_trklen;
   
   TH1D* h_alpha_charge;
-  //TH1D* h_alpha_charge_shift;
   TH1D* h_alpha_charge_bg;
   TH1D* h_alpha_charge_sub;
+
   TH1D* h_beta_charge;
-  //TH1D* h_beta_charge_shift;
   TH1D* h_beta_charge_bg;
   TH1D* h_beta_charge_sub;
 
   const int timeBins = 9;
   float timeMax = 45;
+  bool  fIsMC = true;
   /* 
   TH2D* h_poszy[timeBins];
   TH2D* h_poszy_shift[timeBins];
   TH2D* h_poszy_sub[timeBins];
   */
 
-  float mar_l = 0.12;
-  float mar_r = 0.08;
+  float mar_l = 0.13;
+  float mar_r = 0.10;
   float mar_b = 0.12;
-  float mar_t = 0.08;
+  float mar_t = 0.10;
 
   // MC-truth histograms
   TH1D* h_true_alpha_depne;
   TH1D* h_true_alpha_charge;
   TH1D* h_matched_alpha_charge;
+ 
+
+  //##########################################################################
+  // Set default ROOT plot style
+  //##########################################################################
+  void setRootStyle() {
+    
+    // set margin sizes
+    gStyle->SetPadTopMargin(0.10);
+    gStyle->SetPadRightMargin(0.05);
+    gStyle->SetPadBottomMargin(0.15);
+    gStyle->SetPadLeftMargin(0.15);
+
+    // set title offsets (for axis label)
+    gStyle->SetTitleXOffset(1.2);
+    gStyle->SetTitleYOffset(1.3);
+
+    // use large fonts
+    //Int_t font=42; // Helvetica
+    Double_t tsize=0.050;
+    Double_t lsize=0.045;
+    gStyle->SetTitleSize(tsize,"x");
+    gStyle->SetLabelSize(lsize,"x");
+    gStyle->SetTitleSize(tsize,"y");
+    gStyle->SetLabelSize(lsize,"y");
+    gStyle->SetTitleSize(tsize,"z");
+    gStyle->SetLabelSize(lsize,"z");
+    gStyle->SetTextSize(tsize);
+  
+    // use bold lines and markers
+    //gStyle->SetLineWidth(2);
+    gStyle->SetMarkerStyle(20);
+    gStyle->SetMarkerSize(0.8);
+    gStyle->SetMarkerColor(kAzure-6);
+
+    // get rid of X error bars 
+    gStyle->SetErrorX(0.001);
+
+    // do not display any of the standard histogram decorations
+    //atlasStyle->SetOptTitle(0);
+    //atlasStyle->SetOptStat(1111);
+    //atlasStyle->SetOptStat(0);
+    //atlasStyle->SetOptFit(1111);
+    //atlasStyle->SetOptFit(0);
+
+    // put tick marks on top and RHS of plots
+    //atlasStyle->SetPadTickX(1);
+    //atlasStyle->SetPadTickY(1);
+  }
 
   //##########################################################################
   // Initialize histograms
@@ -288,6 +321,8 @@
     h_beta_charge_sub  ->SetTitle("Candidate betas after background subtraction");
     
     h_time_vs_rate_bipo = new TH1D("time_vs_rate_bipo","BiPo component of dT fit;Event time [hr];Rate per readout",timeBins,0,timeMax);
+    h_time_vs_activity   = (TH1D*)h_time_vs_rate_bipo->Clone("time_vs_activity");
+    h_time_vs_activity    ->GetYaxis()->SetTitle("Equivalent activity [mBq/kg]");
     h_time_vs_rate_bg   = (TH1D*)h_time_vs_rate_bipo->Clone("time_vs_rate_BG");
     h_time_vs_rate_bg   ->SetTitle("Background component");
    
@@ -300,7 +335,7 @@
       //h_poszy_sub[i]    ->SetOption("colz");
     //}
 
-    if( fIsMC ) {
+    if( _isMC ) {
       h_true_alpha_depne  = (TH1D*)h_alpha_charge->Clone("true_alpha_depne");
       h_true_alpha_depne  ->SetTitle("True ionization electrons from alpha");
       h_true_alpha_charge = (TH1D*)h_alpha_charge->Clone("true_alpha_charge");
@@ -313,9 +348,10 @@
     // Diagnotic and utility histograms
     tdir_util->cd();
     h_2D_time_vs_dT      = new TH2D("2D_time_vs_dT",";Event time [hr];Time difference [#mus]",timeBins,0,timeMax, dTbins,0,fdT_max);
-    h_2D_time_vs_dT_shift= (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_shift");
-    h_2D_time_vs_dT_flip= (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_flip");
-    h_2D_time_vs_dT_sub  = (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_sub");
+    h_2D_time_vs_dT_bg= (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_bg");
+    //h_2D_time_vs_dT_shift= (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_shift");
+    //h_2D_time_vs_dT_flip= (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_flip");
+    //h_2D_time_vs_dT_sub  = (TH2D*)h_2D_time_vs_dT->Clone("2D_time_vs_dT_sub");
     h_time_vs_N       = new TH1D("time_vs_N",";Event time [hr];Number of entries into dT plot",timeBins,0,timeMax);
     h_time_vs_ratio     = (TH1D*)h_time_vs_rate_bipo->Clone("time_vs_ratio");
     h_time_vs_ratio     ->SetTitle("Signal-to-background ratio");
@@ -333,13 +369,14 @@
     // ******************************* 
     // Initial configurations
     // *******************************
-    
+    infile_t inFile = fInputFiles[fConfig];
+    _isMC           = inFile.isMC;
 
     // open the file and set up the TTree
-    std::string   _fileName = "files/" + fFileName[fConfig];
+    std::string   _fileName = "files/" + inFile.fileName;
     std::cout<<"Reading input file "<<_fileName<<"\n";
     TFile* file = new TFile(_fileName.c_str(),"READ");
-    fTree = (TTree*)file->Get("blipanaTrkMask/anatree");
+    fTree = (TTree*)file->Get(inFile.treeName.c_str());
   
     // set branches
     fTree->SetBranchAddress("timestamp",&timestamp);
@@ -362,7 +399,7 @@
     fTree->SetBranchAddress("blip_pl0_clustid",&blip_clustid[0]);
     fTree->SetBranchAddress("blip_pl1_clustid",&blip_clustid[1]);
     fTree->SetBranchAddress("blip_pl2_clustid",&blip_clustid[2]);
-    if( fIsMC ) {
+    if( _isMC ) {
       fTree->SetBranchAddress("nedeps",&nedeps);
       fTree->SetBranchAddress("clust_edepid",&clust_edepid);            
       fTree->SetBranchAddress("nparticles",&nparticles);
@@ -370,11 +407,11 @@
       fTree->SetBranchAddress("part_trackID",&part_trackID);
       fTree->SetBranchAddress("part_pdg",&part_pdg);
       fTree->SetBranchAddress("part_startT",&part_startT);
-      fTree->SetBranchAddress("part_depElectrons",&part_depElectrons);
-      fTree->SetBranchAddress("part_numElectrons",&part_numElectrons);
+      //fTree->SetBranchAddress("part_depElectrons",&part_depElectrons);
+      //fTree->SetBranchAddress("part_numElectrons",&part_numElectrons);
       fTree->SetBranchAddress("edep_g4id",&edep_g4id);
       fTree->SetBranchAddress("edep_pdg",&edep_pdg);
-      fTree->SetBranchAddress("edep_depne",&edep_depne);
+      //fTree->SetBranchAddress("edep_depne",&edep_depne);
       fTree->SetBranchAddress("edep_charge",&edep_charge);
       fTree->SetBranchAddress("edep_x",&edep_x);
       fTree->SetBranchAddress("edep_y",&edep_y);
@@ -382,12 +419,14 @@
     }
 
     // make output file to store plots
-    std::string _outFileName = "output/plots_bipo_" + fFileName[fConfig];
+    std::string _outFileName = "output/plots_bipo_" + inFile.fileName;
     fOutFile = new TFile(_outFileName.c_str(), "recreate");
     tdir_plots  = fOutFile->mkdir("plots");
     tdir_util   = fOutFile->mkdir("util");
-    
+   
+
     // initialize all histograms
+    setRootStyle();
     makeHistograms();
     
     // for picky blip mode, set proper restrictions
@@ -424,7 +463,7 @@
       
       // ..... quick-test options ...........
       //int maxEvt    = 1000; if(  iEvent >= maxEvt ) break;
-      //int sparsify  = 10; if(  (iEvent % sparsify) != 0 ) continue; 
+      //int sparsify  = 100; if(  (iEvent % sparsify) != 0 ) continue; 
       //..................................
 
       // Retrieve event info
@@ -432,14 +471,14 @@
       _numEvents++;
       
       // Record the event time relative to start of dataset period
-      double eventHr = ( timestamp - fT0[fConfig] ) / 3600.;
-      if( eventHr < fMinHr || eventHr > fMaxHr ) continue;
-      
+      double eventHr = ( timestamp - inFile.t0 ) / 3600.;
+      if( !_isMC && (eventHr < fMinHr || eventHr > fMaxHr) ) continue;
+     
       h_time_vs_N->Fill(eventHr);
       h_timeFine_vs_evts->Fill(eventHr);
-      int eventTimeBin = int(eventHr / 5 );
-      if( eventTimeBin >= timeBins ) continue;
-   
+      //int eventTimeBin = int(eventHr / 5 );
+      //if( eventTimeBin >= timeBins ) continue;
+      
       // Check truth info
       std::vector<int> beta_g4ids;
       std::vector<int> alpha_g4ids;
@@ -545,8 +584,16 @@
         int w_start = std::max(0,clust_startwire[ic]-1);
         int w_end   = std::min(clust_endwire[ic]+1,(int)_nwires-1);
         if( w_start < 10 || w_end > int(_nwires-10) ) continue;
-        for(int iwire = w_start; iwire <= w_end; iwire++)
-          if( wireIsNoisy[iwire] || wireIsBad[iwire] ) continue;
+        bool flag = false;
+        for(int iwire = w_start; iwire <= w_end; iwire++){
+          if( wireIsNoisy[iwire] || wireIsBad[iwire] ) {
+            flag = true;
+            break;
+          }
+        }
+
+        if( flag ) continue;
+        
 
         // 3D match cuts for beta
         bool isWorthy = (blip_nplanes[iBlip] >= _betaMinPlanes && blip_sigmayz[iBlip] < _betaMaxDiff);
@@ -564,10 +611,11 @@
         // apply charge/size cuts on beta
         if(   clust_charge[ic] < fBetaCharge_min 
           ||  clust_charge[ic] > fBetaCharge_max ) continue;
-       
+        
         // skip if adjacent wires are missing
         if( wireIsBad[clust_wire[ic]+1] ) continue;
         if( wireIsBad[clust_wire[ic]-1] ) continue;
+       
 
         // evaluate if in fiducial volume
         if( fFidVolCut ) {
@@ -594,21 +642,7 @@
         if( peakT < 0 ) continue;
         if( peakT > _maxTick ) continue;
         if( peakT < _minTick ) continue; 
-        
-        // New method: check start and end wire separate; background regions are
-        // now the wire on the far side of either one
-
-
-
-
-
-
-
-        //####################################################################
-        // Old method using only the lead hit wire
-        //####################################################################
-        
-        int fMaxCandidates = 1;
+       
 
         // ------------------------------------------------------------
         // Begin search for alpha candidates
@@ -616,15 +650,6 @@
         int nclusts_inwindow        = 0;
         int nclusts_inwindow_shift  = 0;
         int nclusts_inwindow_shift2  = 0;
-
-        /*
-        // assign wire range
-        int refwire = clust_wire[ic] + fRandomWireShift;
-        if ( refwire < 0  || refwire > nWiresColl ) 
-          refwire = clust_wire[ic] - fRandomWireShift;
-        int w0  = refwire - fWireRange;
-        int w1  = refwire + fWireRange;
-        */
 
         // -------------------------------------------
         // Search for standard candidates
@@ -634,47 +659,16 @@
         h_nclusts_inwindow->Fill(nclusts_inwindow);
         h_ncands_inwindow->Fill((int)v_cands.size());
         
-        /*
         // -------------------------------------------
         // Search for background candidates (wire shift)
-        int shift = 2*fWireRange+1;
-        
-        // check that in shifted region, there aren't bad wires
-        int ref_shift;
-        int w0_shift, w1_shift;
-        int n_regions_checked = 0;
-        
-        std::vector<BiPoCandidate> v_cands_shift;
-        std::vector<BiPoCandidate> v_cands_shift2;
-        
-        // 1) positive shift
-        ref_shift = refwire + shift;
-        w0_shift = w0 + shift;
-        w1_shift = w1 + shift;
-  		  if( !wireIsBad[w0_shift] && !wireIsBad[w1_shift] && !wireIsBad[ref_shift]) {
-          n_regions_checked++;
-          v_cands_shift  = FindCandidates(ic, w0_shift, w1_shift, false, nclusts_inwindow_shift);
-        }
-        
-        // 2) negative shift
-        ref_shift = refwire - shift;
-        w0_shift = w0 - shift;
-        w1_shift = w1 - shift;
-  		  if( !wireIsBad[w0_shift] && !wireIsBad[w1_shift] && !wireIsBad[ref_shift]) {
-          n_regions_checked++;
-          v_cands_shift2  = FindCandidates(ic, w0_shift, w1_shift, false, nclusts_inwindow_shift2);
-        }
-        */
         int nwires_shift = 0;
         int shift = 2*fWireRange+1;
         std::vector<BiPoCandidate> v_cands_shift = FindCandidates(ic,shift,false,nclusts_inwindow_shift,nwires_shift);
-
 
         // ------------------------------------------------------------
         // Search for background candidates (same wire, but dT-flip)
         int nclusts_inwindow_flip;
         int nwires_flip = 0;
-        //std::vector<BiPoCandidate> v_cands_flip = FindCandidates(ic, w0, w1, true, nclusts_inwindow_flip);
         std::vector<BiPoCandidate> v_cands_flip = FindCandidates(ic, 0, true, nclusts_inwindow_flip,nwires_flip);
       
         // --------------------------------------------
@@ -711,20 +705,18 @@
 
         }//end evaluation of standard cands
         
-  
-  
         // --------------------------------------------
         // Evaluate wire shift candidates
         // ---------------------------------------------
         //float weight = 1./float(n_regions_checked);
         //std::cout<<"applying weight "<<weight<<" to background\n";
         float weight = nwires/float(nwires_shift);
-        if( v_cands_shift.size() && v_cands_shift.size() <= fMaxCandidates && nclusts_inwindow_shift <=  fMaxClustMult ) {
+        if( v_cands_shift.size() && v_cands_shift.size() ==1 && nclusts_inwindow_shift <=  fMaxClustMult ) {
           for(auto& thisCand : v_cands_shift ) {
             if( thisCand.dT >= fdT_min ) {
               h_cand_dT_shift             ->Fill(thisCand.dT,weight);
-              h_2D_time_vs_dT_shift       ->Fill(eventHr,thisCand.dT,weight);
               if( fBackgroundMode == 0 ) {
+                h_2D_time_vs_dT_bg       ->Fill(eventHr,thisCand.dT,weight);
                 h_beta_charge_bg         ->Fill(thisCand.q1,weight);
                 h_alpha_charge_bg        ->Fill(thisCand.q2,weight);
               }
@@ -732,149 +724,75 @@
           }//endloop over candidates
         }//end evaluation of wire-shift candidates
         
-        /*
-        if( v_cands_shift2.size() && v_cands_shift2.size() <= fMaxCandidates && nclusts_inwindow_shift2 <=  fMaxClustMult ) {
-          for(auto& thisCand : v_cands_shift2 ) {
-            if( thisCand.dT >= fdT_min ) {
-              h_cand_dT_shift           ->Fill(thisCand.dT, weight);
-              h_2D_time_vs_dT_shift     ->Fill(eventHr,thisCand.dT, weight);
-              if( fBackgroundMode == 0 ) {
-                h_beta_charge_bg         ->Fill(thisCand.q1,weight);
-                h_alpha_charge_bg        ->Fill(thisCand.q2,weight);
-              }
-              //h_poszy_sub[eventTimeBin] ->Fill(blip_z[thisCand.blipID],blip_y[thisCand.blipID]);
-            }
-          }//endloop over candidates
-        }//end evaluation of wire-shift candidates
-        */
 
         // --------------------------------------------
         // Evaluate dT-flip candidates
         // ---------------------------------------------
-        if( v_cands_flip.size() && v_cands_flip.size() <= fMaxCandidates && nclusts_inwindow_flip <=  fMaxClustMult ) {
+        if( v_cands_flip.size() && v_cands_flip.size() ==1 && nclusts_inwindow_flip <=  fMaxClustMult ) {
           for(auto& thisCand : v_cands_flip ) {
             if( thisCand.dT >= fdT_min ) {
               h_cand_dT_flip             ->Fill(thisCand.dT);
-              h_2D_time_vs_dT_flip       ->Fill(eventHr,thisCand.dT);
               if( fBackgroundMode == 1 ) {
+                h_2D_time_vs_dT_bg       ->Fill(eventHr,thisCand.dT);
                 h_beta_charge_bg       ->Fill(thisCand.q1);
                 h_alpha_charge_bg        ->Fill(thisCand.q2);
               }
             }
           }//endloop over candidates
         }//end evaluation of dt-flip candidates
-     
-
-
-        //#######################################################################################################
-
-
-        // ------------------------------------------------------------
-        // Begin search for alpha candidates
-        // ------------------------------------------------------------
-      //  int nclusts_inwindow        = 0;
-      //  int nclusts_inwindow_shift  = 0;
-      //  int nclusts_inwindow_shift2 = 0;
-      //  
-      //  int nwiresChecked;
-      //  std::vector<BiPoCandidate> v_cands = FindCandidatesCluster(ic, false, nclusts_inwindow, nwiresChecked);
-
-      //  int nwiresChecked_bg;
-      //  std::vector<BiPoCandidate> v_cands_shift = FindCandidatesCluster(ic, true, nclusts_inwindow_shift, nwiresChecked_bg);
-
-      //  h_nclusts_inwindow->Fill(nclusts_inwindow);
-      //  h_ncands_inwindow->Fill(v_cands.size());
-
-      //  // --------------------------------------------
-      //  // Evaluate standard candidates
-      //  // ---------------------------------------------
-      //  if( v_cands.size() == 1 && nclusts_inwindow <= fMaxClustMult ) {
-      //    // plot locations
-      //    h_zy_bipos->Fill( blip_z[iBlip], blip_y[iBlip] );
-      //    h_wt_bipos->Fill( clust_wire[ic], clust_time[ic] );
-      //    // loop through and update histograms/counts
-      //    BiPoCandidate thisCand = v_cands.at(0);
-      //      _clustAvailable[thisCand.id1] = false;
-      //      _clustAvailable[thisCand.id2] = false;
-      //      int blipid = clust_blipid[thisCand.id2];
-      //      if( blipid >= 0 ) _blipAvailable[blipid] = false;
-      //      if( thisCand.dT > 6.25 && thisCand.dT < 312.5 ) {
-      //        _numBiPo_6_312++;
-      //        h_timeFine_vs_rate  ->Fill(eventHr);
-      //      }
-      //      if( thisCand.dT > fdT_min ) {
-      //        _numBiPo++;
-      //        h_beta_charge       ->Fill(thisCand.q1);
-      //        h_alpha_charge      ->Fill(thisCand.q2);
-      //        h_alpha_nhits       ->Fill(clust_nhits[thisCand.id2]);
-      //        h_cand_dT           ->Fill(thisCand.dT);
-      //        h_2D_time_vs_dT        ->Fill(eventHr,thisCand.dT);
-      //        //if( thisCand.dT > 10 && thisCand.dT < 20 ) {
-      //        //  std::cout
-      //        //  <<"Found a weird one! dT "<<thisCand.dT
-      //        //  <<", RMS " <<clust_lhit_rms[thisCand.id1]<<", "<<clust_lhit_rms[thisCand.id2]
-      //        //  <<", amp: "<<clust_lhit_amp[thisCand.id1]<<", "<<clust_lhit_amp[thisCand.id2]<<"\n";
-      //        //}
-      //      }
-      //  }//end evaluation of standard cands
-  
-      // 
-      //  // --------------------------------------------
-      //  // Evaluate dT-shift candidates
-      //  // ---------------------------------------------
-      //  float weight = float(nwiresChecked)/float(nwiresChecked_bg);
-      //  //std::cout<<"Applying weight "<<weight<<"\n";
-      //  if( v_cands_shift.size() == 1 && nclusts_inwindow_shift <= fMaxClustMult ) {
-      //    BiPoCandidate thisCand = v_cands_shift.at(0);
-      //      if( thisCand.dT >= fdT_min ) {
-      //        h_beta_charge_shift  ->Fill(thisCand.q1,weight);
-      //        h_alpha_charge_shift ->Fill(thisCand.q2,weight);
-      //        h_cand_dT_shift      ->Fill(thisCand.dT,weight);
-      //        h_2D_time_vs_dT_shift ->Fill(eventHr,thisCand.dT,weight);
-      //      }
-      //  }//end evaluation of dT-shift candidates
-
-
-
+      
 
       }//end loop over 3D blips
 
     }//endloop over events
     double loopDuration = ( time(NULL) - loopStart );
 
-    
+   
     // ***************************************************
     // Scale dT plots so they're per readout
     // ***************************************************
     _totalLiveTime = float(_numEvents) * _liveTimePerEvt;
     float scaleFact = 1./( float(_numEvents) );
-    //h_clust_dT        ->Scale( scaleFact );
     h_cand_dT         ->Scale( scaleFact );
     h_cand_dT_shift   ->Scale( scaleFact );
     h_cand_dT_flip    ->Scale( scaleFact );
-    h_timeFine_vs_rate->Divide( h_timeFine_vs_evts );
+    //h_2D_time_vs_dT   ->Scale( scaleFact );
+    //h_2D_time_vs_dT_shift ->Scale( scaleFact );
+    //h_2D_time_vs_dT_flip  ->Scale( scaleFact );
+    h_timeFine_vs_rate  ->Divide( h_timeFine_vs_evts );
 
-    
     // ***************************************************
     // Histogram subtraction time!
     // ***************************************************
-    h_cand_dT_sub     ->Add(h_cand_dT,      1);
-    h_2D_time_vs_dT_sub  ->Add(h_2D_time_vs_dT,   1);
-    h_alpha_charge_sub->Add(h_alpha_charge, 1);
-    h_beta_charge_sub->Add(h_beta_charge, 1);
+    h_cand_dT_sub         ->Add(h_cand_dT,        1);
+    //h_2D_time_vs_dT_sub   ->Add(h_2D_time_vs_dT,  1);
+    h_alpha_charge_sub    ->Add(h_alpha_charge,   1);
+    h_beta_charge_sub     ->Add(h_beta_charge,    1);
     
     if( fBackgroundMode == 0 ) {
-      h_cand_dT_sub       ->Add(h_cand_dT_shift,     -1.);
-      h_2D_time_vs_dT_sub ->Add(h_2D_time_vs_dT_shift,  -1.);
+      h_cand_dT_sub       ->Add(h_cand_dT_shift,      -1.);
+      //h_2D_time_vs_dT_sub ->Add(h_2D_time_vs_dT_shift,-1.);
     } else
     if( fBackgroundMode == 1 ) {
-      h_cand_dT_sub       ->Add(h_cand_dT_flip,     -1.);
-      h_2D_time_vs_dT_sub ->Add(h_2D_time_vs_dT_flip,  -1.);
+      h_cand_dT_sub       ->Add(h_cand_dT_flip,       -1.);
+      //h_2D_time_vs_dT_sub ->Add(h_2D_time_vs_dT_flip, -1.);
     }
 
     h_alpha_charge_sub->Add(h_alpha_charge_bg,-1.);
     h_beta_charge_sub->Add(h_beta_charge_bg,-1.);
-    
+
+    /*
+    h_cand_dT         ->Scale( scaleFact );
+    h_cand_dT_shift   ->Scale( scaleFact );
+    h_cand_dT_flip    ->Scale( scaleFact );
+    //h_2D_time_vs_dT   ->Scale( scaleFact );
+    //h_2D_time_vs_dT_shift ->Scale( scaleFact );
+    //h_2D_time_vs_dT_flip  ->Scale( scaleFact );
+    h_timeFine_vs_rate  ->Divide( h_timeFine_vs_evts );
+    h_cand_dT_sub->Scale(scaleFact);
+    h_2D_time_vs_dT_sub ->Scale(scaleFact);
+    */
+
     //for(int i=0; i<timeBins; i++){
       //h_poszy_sub[i]->Add(h_poszy[i],1);
       //h_poszy_sub[i]->Add(h_poszy_shift[i],-1);
@@ -887,7 +805,7 @@
     makePlots();
     
     printf("\n*******************************************\n");
-    printf("File                : %s\n",      fFileName[fConfig].c_str()); 
+    printf("File                : %s\n",      inFile.fileName.c_str()); 
     printf("Total events        : %i\n",      _numEvents); 
     printf("Total live time     : %f sec\n",  _totalLiveTime);
     printf("Live time per evt   : %f us\n",   _liveTimePerEvt*1e6);
@@ -909,81 +827,101 @@
   //#################################################################################
   void makePlots()
   {
-   
-   
-    if( !fIsMC ) {
   
-    // ============================================
-    // Rate vs time plots
-    // ============================================
-    std::cout<<"\nMaking rate vs time plot...\n";
+    std::string name;
+    float       range;
+    float       min;
+    float       max;
    
-    
-    h_time_vs_rate_bipo->SetOption("E1");
+    if( !_isMC ) {
 
-    TGraphErrors* gr_sig = new TGraphErrors();
-    //TGraphErrors* gr_bg;
+      // ============================================
+      // Do slice-by-slice dT fit
+      // ============================================
+      TH1D* h_time_vs_p0 = (TH1D*)h_time_vs_rate_bipo->Clone("time_vs_p0");
+      TH1D* h_time_vs_p1 = (TH1D*)h_time_vs_rate_bipo->Clone("time_vs_p1");
 
-    TH1D* h_slice;
-    for(int i=1; i<=(int)h_time_vs_N->GetXaxis()->GetNbins(); i++){
-      h_slice = Make1DSlice( h_2D_time_vs_dT_sub, i, i, Form("dTfit_%i",i) );
-      h_slice->Scale( 1. / (float)h_time_vs_N->GetBinContent(i) );
-      float t = h_time_vs_N->GetXaxis()->GetBinCenter(i);
-      float dt = h_time_vs_N->GetXaxis()->GetBinWidth(i)/sqrt(12);
-      std::cout<<"time: "<<t<<" hrs\n";
-
-      FitResult fr = fitdT(h_slice,false);
-      if( fr.rate_signal != -9 ) {
-        int npt = gr_sig->GetN();
-        gr_sig->SetPoint( npt , t, fr.rate_signal );
-        gr_sig->SetPointError(  npt,  dt, fr.rate_signal_err);
-        h_time_vs_rate_bipo ->SetBinContent(i,fr.rate_signal);
-        h_time_vs_rate_bipo ->SetBinError(i, fr.rate_signal_err);
-        h_time_vs_rate_bg   ->SetBinContent(i,fr.rate_bg);
-        h_time_vs_rate_bg   ->SetBinError(i, fr.rate_bg_err);
-        h_time_vs_ratio     ->SetBinContent(i,fr.ratio);
+      TH1D* h_slice;
+      TH1D* h_bg;
+      int nbins = h_time_vs_N->GetXaxis()->GetNbins();
+      for(int i=1; i<=nbins; i++){
+        //std::cout<<"SLICE "<<i<<"   \n";
+        h_slice     = Make1DSlice( h_2D_time_vs_dT, i, i, Form("time_vs_dT_%i",i) );
+        h_bg    = Make1DSlice( h_2D_time_vs_dT_bg, i, i, Form("time_vs_dT_flip_%i",i) );
+        float scaleFact = 1./(float)h_time_vs_N->GetBinContent(i);
+        h_slice->Scale(scaleFact);
+        h_bg->Scale(scaleFact);
+        h_slice->Add( h_bg, -1. );
+        float t = h_time_vs_N->GetXaxis()->GetBinCenter(i);
+        float dt = h_time_vs_N->GetXaxis()->GetBinWidth(i)/sqrt(12);
+        FitResult fr = fitdT(h_slice,false);
+        if( fr.rate_signal != -9 ) {
+          h_time_vs_activity  ->SetBinContent(  i,  fr.activity);
+          h_time_vs_activity  ->SetBinError(  i,  fr.activity_err);
+          h_time_vs_rate_bipo ->SetBinContent(  i,  fr.rate_signal);
+          h_time_vs_rate_bipo ->SetBinError(    i,  fr.rate_signal_err);
+          h_time_vs_rate_bg   ->SetBinContent(  i,  fr.rate_bg);
+          h_time_vs_rate_bg   ->SetBinError(    i,  fr.rate_bg_err);
+          h_time_vs_p0        ->SetBinContent(  i,  fr.p0);
+          h_time_vs_p0        ->SetBinError(    i,  fr.p0_err);
+          h_time_vs_p1        ->SetBinContent(  i,  fr.p1);
+          h_time_vs_p1        ->SetBinError(    i,  fr.p1_err);
+        }
       }
-    }
-    
-    fOutFile->cd();
-    h_time_vs_rate_bipo ->Write(0, TObject::kOverwrite );
-    h_time_vs_rate_bg   ->Write(0, TObject::kOverwrite );
-    h_time_vs_ratio     ->Write(0, TObject::kOverwrite );
+      
+      fOutFile->cd();
+      h_time_vs_activity ->Write(0, TObject::kOverwrite );
+      h_time_vs_rate_bipo ->Write(0, TObject::kOverwrite );
+      h_time_vs_rate_bg   ->Write(0, TObject::kOverwrite );
+      h_time_vs_ratio     ->Write(0, TObject::kOverwrite );
   
-    TH1D* h1  = h_time_vs_rate_bipo; //(TH1D*)h_time_vs_rate_bipo->Clone("bipo");
-    TH1D* h2  = (TH1D*)h_time_vs_rate_bg->Clone("bg");
-    FormatTH1D(h1, kBlue, 1, 3 );
-    FormatTH1D(h2, kRed, 1, 3 );
-    //FormatTH1D(h3, kBlack, 1, 3 );
+
+      // ============================================
+      // Plot fit parameters vs time
+      // ============================================
+      TH1D* h_p0  = h_time_vs_rate_bg; //h_time_vs_p0;
+      TH1D* h_p1  = h_time_vs_rate_bipo; //h_time_vs_p1;
+      FormatTH1D(h_p1, kBlue, 1, 2, 20, 1);
+      FormatTH1D(h_p0, kRed, 1, 2, 20, 1);
+      name = "c_time_vs_rate";
+      min = std::min(GetHistMin(h_p0),GetHistMin(h_p1));
+      max = std::max(GetHistMax(h_p0),GetHistMax(h_p1));
+      range = (max-min);
+      TCanvas* c = new TCanvas(name.c_str(),name.c_str(),500,380);
+      gStyle->SetOptStat(0);
+      gPad->SetGridy(1);
+      h_p0->GetYaxis()->SetRangeUser(min-0.3*range, max+0.5*range);
+      h_p0->GetYaxis()->SetTitleOffset(1.1); 
+      //h_p0->GetYaxis()->SetTitle("#DeltaT fit parameter value");
+      h_p0->GetYaxis()->SetTitle("Fit component integral");
+      h_p0->DrawCopy();
+      h_p1->DrawCopy("same");
+      
+      tdir_plots->cd();
+      c->Write();
+
+
+      // ============================================
+      // Plot BiPo rate vs time
+      // ============================================
+      TH1D* h1  = h_time_vs_activity;
+      FormatTH1D(h1, kBlue+2, 1, 2, 20, 1);
    
-    std::string name = "c_time_vs_rate";
-    TCanvas* c = new TCanvas(name.c_str(),name.c_str(),600,450);
-    gPad->SetMargin(mar_l, mar_r, mar_b, mar_t ); 
-    gPad->SetGridy(1);
-    //float max = std::max( GetHistMax(h1), GetHistMax(h2) );
-    float min = std::min(GetHistMin(h1),GetHistMin(h2));
-    float max = std::max(GetHistMax(h1),GetHistMax(h2));
-    float range = (max-min);
-    float center = (max+min)/2.;
-    float yl = center - 1.2*range/2.;
-    float yh = center + 1.2*range/2.;
-    h1->GetYaxis()->SetRangeUser(min*1.2,max*1.2);
-    h1->DrawCopy();
-    h2->DrawCopy("same");
-    //h3->DrawCopy("same");
-    tdir_plots->cd();
-    c->Write();
-   
-    /*
-    name = "c_time_vs_rate_gr";
-    TCanvas* c2 = new TCanvas(name.c_str(),name.c_str(),600,450);
-    gPad->SetMargin(mar_l, mar_r, mar_b, mar_t ); 
-    gr_sig->Draw("AP");
-    c2->Write();
-    */
+      name = "c_time_vs_act";
+      range = (GetHistMax(h1)-GetHistMin(h1));
+      TCanvas* c2 = new TCanvas(name.c_str(),name.c_str(),500,380);
+      gStyle->SetOptStat(0);
+      gPad->SetGridy(1);
+      h1->GetYaxis()->SetRangeUser(GetHistMin(h1)-0.3*range, GetHistMax(h1)+0.5*range);
+      h1->GetYaxis()->SetTitleOffset(1.1); 
+      h1->GetYaxis()->SetTitle("Equivalent activity [mBq/kg]");
+      h1->DrawCopy();
+      
+      c2->Write();
+      //
     
     }
-    
+
 
     // ============================================
     // Do final fit on dT spectrum
@@ -1003,8 +941,8 @@
   
     std::cout<<"Fitting dT spectrum "<<h->GetTitle()<<", "<<h->GetEntries()<<"\n";
     std::string label = h->GetName();
-    TCanvas* c = new TCanvas(Form("c_fit_%s",label.c_str()),Form("c_fit_%s",label.c_str()),600,500);
-    gPad->SetMargin(mar_l, mar_r, mar_b, mar_t ); 
+    TCanvas* c = new TCanvas(Form("c_fit_%s",label.c_str()),Form("c_fit_%s",label.c_str()),500,420);
+    //gPad->SetMargin(mar_l, mar_r, mar_b, mar_t ); 
     TH1D* hc = (TH1D*)h->Clone();
     float histMax = GetHistMax(hc);
    
@@ -1025,7 +963,7 @@
     // *** single exp fit + flat BG ***
     TF1* fit = new TF1("FullFit","[0] + [1]*exp(-x/[2])",fdT_min,fdT_max);
     fit->SetParameter(0, 0. );
-    fit->SetParLimits(0, 0, histMax );
+    fit->SetParLimits(0, -histMax, histMax );
     fit->SetParameter(1, histMax );
     fit->SetParLimits(1, 0, 2*histMax );
     fit->FixParameter(2, 164.3 );
@@ -1078,8 +1016,9 @@
     float N_bg_err = fit->IntegralError(fdT_min,fdT_max)/fdT_binSize;
     float sbratio = N_bipo / N_bg;
 
-    float activity_mBq = 1e3*( (n_bipo*_fidCorFactor) / _liveTimePerEvt ) / 85000.;
 
+    float activity_mBq = 1e3*( (n_bipo*_fidCorFactor) / _liveTimePerEvt ) / 85000.;
+    float activity_mBq_err = (n_bipo_err/n_bipo)*activity_mBq;
     
     printf("================ dT fit =================\n");
     printf("p0                  : %f +/- %f\n", fit->GetParameter(0),fit->GetParError(0));
@@ -1093,7 +1032,7 @@
     printf("S/BG ratio          : %f \n",sbratio);
     printf("Extrapolated rate   : %f BiPos per evt\n",n_bipo);
     printf("Fiducial correction : %f BiPos per evt\n",n_bipo*_fidCorFactor);
-    printf("Equivalent activity : %f mBq/kg\n",       activity_mBq);
+    printf("Equivalent activity : %f +/- %f mBq/kg\n",activity_mBq,activity_mBq_err);
     printf("(assuming 100%% eff)\n");
   
     out.rate_signal       = n_bipo;
@@ -1101,6 +1040,12 @@
     out.rate_bg           = N_bg;
     out.rate_bg_err       = N_bg_err;
     out.ratio             = sbratio;
+    out.p0                = fit->GetParameter(0);
+    out.p0_err            = fit->GetParError(0);
+    out.p1                = fit->GetParameter(1);
+    out.p1_err            = fit->GetParError(1);
+    out.activity          = activity_mBq;
+    out.activity_err      = activity_mBq_err;
     return out;
   
   }
@@ -1251,69 +1196,6 @@
     return v;
   
   }
-  
-
-  //################################################################################
-  std::vector<BiPoCandidate> FindCandidatesCluster(int ic, bool useSideBands, int& npileup, int& nwiresChecked ) {
-        
-    // identify which wires to check
-    std::set<int> wires;
-    
-    int w_start = clust_startwire[ic] + fRandomWireShift;
-    int w_end   = clust_endwire[ic] + fRandomWireShift;
-    if ( w_start < 0  || w_start > nWiresColl ) w_start -= 2*fRandomWireShift;
-    if ( w_end < 0  || w_end > nWiresColl ) w_end -= 2*fRandomWireShift;
-    
-    if( useSideBands ) {
-      w_start -= (2*fWireRange+1);
-      w_end   += (2*fWireRange+1);
-    }
-
-    int w1 = w_start-fWireRange;
-    int w2 = w_end+fWireRange;
-    for(int w=w1; w<=w2; w++){
-      if( abs(w-w_start)<= fWireRange ) wires.insert(w);
-      if( abs(w-w_end)  <= fWireRange ) wires.insert(w);
-    }
-    
-
-    //std::cout<<"Cluster has "<<clust_nwires[ic]<<" --> BG? "<<useSideBands<<"  identified "<<wires.size()<<" wires to check for alpha on\n";
-    
-    nwiresChecked = wires.size();
-
-    std::vector<BiPoCandidate> v;
-    npileup = 0;
-   
-    for(auto iWire : wires ) {
-      //std::cout<<iWire<<"\n";
-      for(auto& jc : _map_wire_clusters[iWire] ) {
-        if( ic == jc ) continue;
-        if( !_clustAvailable[jc] ) continue;
-        if( fAlphaReq3D && clust_blipid[jc] < 0 ) continue;
-        
-        // TODO: correct this for wire offset
-        float dT  = (clust_time[jc]-clust_time[ic])*fSamplePeriod;
-        
-        if( dT > 0 && fabs(dT) < fdT_max ) {
-          npileup++;
-        
-            // --- alpha charge/nhits cut ---
-            if(   clust_charge[jc] > fAlphaCharge_min 
-              &&  clust_charge[jc] < fAlphaCharge_max 
-              &&  clust_nhits[jc] <= fAlphaHits_max ) {
-          
-              int blipID = clust_blipid[ic];
-              BiPoCandidate c = { blipID, ic, jc, fabs(dT), clust_charge[ic], clust_charge[jc]};
-              v.push_back(c);
-            }
-        } 
-      }
-    }//end check on start wire
-      
-    return v;
-  
-  }
-
 
   //###################################################################
   int FindG4Index(int g4id) {

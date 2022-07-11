@@ -4,3 +4,4 @@ test/*
 old/*
 *.swp
 *.DS_Store
+*.cxx

@@ -1,4 +1,4 @@
-
+  
   // Set max array sizes
 	const int kMaxHits  = 100000;
 	const int kMaxBlips = 10000;
