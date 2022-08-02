@@ -55,9 +55,10 @@
   int   edep_pdg[kMaxEDeps];      // leading G4 track PDG
   int   edep_clustid[kMaxEDeps];  // hitclust ID
   int   edep_blipid[kMaxEDeps];   // reconstructed blip ID
+  int   edep_electrons[kMaxEDeps];    // total ionization electrons deposited
+  int   edep_charge[kMaxEDeps];   // total electrons reaching anode wires
+  float edep_tdrift[kMaxEDeps];
   float edep_energy[kMaxEDeps];   // total energy deposited (MeV)
-  int   edep_depne[kMaxEDeps];    // total ionization electrons deposited
-  float edep_charge[kMaxEDeps];   // total electrons reaching anode wires
   float edep_x[kMaxEDeps];        // x (cm)
   float edep_y[kMaxEDeps];        // y (cm)
   float edep_z[kMaxEDeps];        // z (cm)

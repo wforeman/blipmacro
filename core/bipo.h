@@ -10,14 +10,14 @@
   
   // Struct to hold fit results
   struct FitResult { 
-    float p0, p0_err, p1, p1_err;
-    float rate_signal     = -9;
-    float rate_signal_err = 0;
-    float rate_bg         = -9;
-    float rate_bg_err     = 0;
-    float ratio           = -9;
-    float activity        = -9;
-    float activity_err        = -9;
+    double p0, p0_err, p1, p1_err;
+    double rate_signal     = -9;
+    double rate_signal_err = 0;
+    double rate_bg         = -9;
+    double rate_bg_err     = 0;
+    double ratio           = -9;
+    double activity        = -9;
+    double activity_err        = -9;
   };
   
   // useful structure to save candidate info in
