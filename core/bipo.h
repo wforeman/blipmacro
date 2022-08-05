@@ -1,5 +1,12 @@
 
-  // Struct for input file parameters
+  // NOTES:
+  //
+  // Mike Z.'s elog entry 126161: bypass started 7/29/21 16:33 --> 1627594380
+  //
+  // Run 3 dataset: 
+  //  T0 = 1528520000 (9 June 2018, 23:53)
+  //  T1 = 1531760000 (16 July 2018, 11:53)
+  
   struct infile_t { 
     std::string   fileName;
     std::string   treeName;
@@ -17,8 +24,58 @@
     double rate_bg_err     = 0;
     double ratio           = -9;
     double activity        = -9;
-    double activity_err        = -9;
+    double activity_err    = -9;
   };
   
   // useful structure to save candidate info in
   struct BiPoCandidate { int blipID, id1, id2; float dT, q1, q2; };
+
+  //##########################################################################
+  // Set default ROOT plot style
+  //##########################################################################
+  void setRootStyle() {
+    
+    // set margin sizes
+    gStyle->SetPadTopMargin(0.10);
+    gStyle->SetPadRightMargin(0.05);
+    gStyle->SetPadBottomMargin(0.15);
+    gStyle->SetPadLeftMargin(0.15);
+
+    // set title offsets (for axis label)
+    gStyle->SetTitleXOffset(1.2);
+    gStyle->SetTitleYOffset(1.3);
+
+    // use large fonts
+    //Int_t font=42; // Helvetica
+    Double_t tsize=0.040;
+    Double_t lsize=0.040;
+    gStyle->SetTitleSize(tsize,"x");
+    gStyle->SetLabelSize(lsize,"x");
+    gStyle->SetTitleSize(tsize,"y");
+    gStyle->SetLabelSize(lsize,"y");
+    gStyle->SetTitleSize(tsize,"z");
+    gStyle->SetLabelSize(lsize,"z");
+    gStyle->SetTextSize(tsize);
+  
+    // use bold lines and markers
+    //gStyle->SetLineWidth(2);
+    gStyle->SetMarkerStyle(20);
+    gStyle->SetMarkerSize(0.8);
+    gStyle->SetMarkerColor(kAzure-6);
+
+    // get rid of X error bars 
+    gStyle->SetErrorX(0.001);
+
+    // do not display any of the standard histogram decorations
+    //atlasStyle->SetOptTitle(0);
+    //atlasStyle->SetOptStat(1111);
+    //atlasStyle->SetOptStat(0);
+    //atlasStyle->SetOptFit(1111);
+    //atlasStyle->SetOptFit(0);
+
+    // put tick marks on top and RHS of plots
+    //atlasStyle->SetPadTickX(1);
+    //atlasStyle->SetPadTickY(1);
+  }
+
+  
