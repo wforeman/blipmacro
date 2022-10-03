@@ -9,44 +9,49 @@
   #include <time.h>
   
   // --- Choose run configuration ---
-  int   fConfig   = 1;
-  float fMinHr    = 0;
-  float fMaxHr    = 999;
+  int   fConfig   = 0;
+  float fMinHr    = 0; //30;
+  float fMaxHr    = 40e9; //10e9;
   
+  float fakeLifetime = 5; // ms
+  float chargeScaling = 0.905; 
+  TRandom2* fRand;
+
   // --- Input files ---
   infile_t fInputFiles[4] = {
-  //*0*/  { "BlipAna_20220802_BiPo_MC_Overlay_DefaultQY.root", "blipanaTrkMask/anatree",true,0,0},
-  /*0*/  { "BlipAna_20220802_BiPo_MC_Overlay.root", "blipanaTrkMask/anatree",true,0,0},
-  //*0*/  { "BlipAna_20220728_BiPo_MC.root", "blipana/anatree",true,0,0},
-  /*1*/  { "BlipAna_20220731_RadonData_Phase1.root","blipanaTrkMask/anatree",false,1627415210,1627592728},
-  /*2*/  { "BlipAna_20220731_RadonData_Phase2.root","blipanaTrkMask/anatree",false,1627594380,1627761265},
-  /*3*/  { "BlipAna_20220731_Data_Run3.root","blipanaTrkMask/anatree",false,1528520000,1531760000}
+  /*0*/  { "BlipAna_20220915_BiPo_Overlay_QY62.root", "blipanaTrkMask/anatree",true,0,0},
+         //{ "BlipAna_20220812_Data_Overlay.root","blipanaTrkMask/anatree",false,0,0},
+  /*1*/  { "BlipAna_20220823_RadonData_Phase1.root","blipanaTrkMask/anatree",false,1627415210,1627592728},
+  /*2*/  { "BlipAna_20220823_RadonData_Phase2.root","blipanaTrkMask/anatree",false,1627594380,1627761265},
+  /*3*/  { "BlipAna_20220915_Data_Run3.root","blipanaTrkMask/anatree",false,1528526500,1532448800}
   };
   
-  const float binPeriodHrs[4] = { 2,   2,  2,  48 };
-  const float binPeriodMax[4] = { 44, 44, 44,  864 };
+  float fAssumedTime  = 1150.; // us
+  float fRecomb       = 0.584; 
+
+  const float binPeriodHrs[4] = { 2,  2,   2,   48 };
+  const float binPeriodMax[4] = { 44, 44, 44,  1104 };
 
   // --- General selection options ---
-  bool  fPickyBlipMode    = false;  // Require beta blips match on all 3 planes
-  int   fBackgroundMode   = 1;      // 0= wire-shift, 1= dT-flip
-  int   fWireRange        = 1;      // +/- range to look for alpha candidate
-  float fBetaCharge_min   = 6e3;    // Min charge of beta candidate blip [e-]
-  float fBetaCharge_max   = 80e3;   // Max charge of beta candidate blip [e-]
+  bool  fFidVolCut        = 1;      // Fiducialize beta
+  bool  fPickyBetaMode    = 0;      // Require beta blips match on all 3 planes
+  float fBetaCharge_min   = 12e3;   // Min charge of beta candidate blip [e-]
+  float fBetaCharge_max   = 90e3;   // Max charge of beta candidate blip [e-]
+  float fBetaEnergy_min   = 0.5;    // 
+  float fBetaEnergy_max   = 3.5;    
+  int   fWireRange        = 0;      // +/- range to look for alpha candidate;
   float fAlphaCharge_min  = 0e3;    // Min charge of alpha candidate cluster [e-]
   float fAlphaCharge_max  = 6e3;    // Max charge of alpha candidate cluster [e-]
-  int   fAlphaWires_max   = 2;      // Max wire extent on coll plane
-  int   fMaxClustMult     = 999;    // Max number of clusters in time window
-  int   fMaxCands         = 999;    // Max allowable number of alpha candidates
-  bool  fFidVolCut        = false;    // Fiducialize beta?
-  float fZlim[2]          = {50,985}; // Z range (0 to 1037 cm)
-  float fYlim[2]          = {-80,80}; // Y range (-120 to 120 cm)
+  float fAlphaEnergy_min  = 0;
+  float fAlphaEnergy_max  = 0.24;   //
+  bool  fLinearizeCorr    = 1;      // Linearize detector effects control facto
   float fdT_binSize       = 20.;    // Bin width for all dT spectra plots [us]
   float fdT_min           = 20.;    // Min dT for looking for candidate [us]
   float fdT_max           = 500.;   // Max dT for looking for candidate [us]
- 
+  
   // --- MC efficiency for equiv activity calc ---
-  double fEfficiencyMC      = 0.104;
-  double fEfficiencyMC_err  = 0.028;
+  double fEfficiencyMC      = 0.11;
+  double fEfficiencyMC_err  = 0.03;
 
   // --- MC options ---
   bool  fIgnoreTrueAlphas = false;
@@ -55,9 +60,13 @@
   // --- Detector properties ---
   int   nWiresColl        = 3455;
   float fSamplePeriod     = 0.5; // microseconds
+  float fZlim[2]          = {50,985}; // Z range (0 to 1037 cm)
+  float fYlim[2]          = {-80,80}; // Y range (-120 to 120 cm)
   
   // --- Special switches ---
   int   fRandomWireShift  = 0; 
+  int   fBackgroundMode   = 1;      // 0= wire-shift, 1= dT-flip
+  bool  fCheckWholeClust  = false; //true;
   
   // --- Noisy wires to skip (collection plane) ---
   std::vector<int> fNoisyWires{
@@ -101,10 +110,7 @@
   // Fiducial vol correction factor
   float dz = fZlim[1]-fZlim[0];
   float dy = fYlim[1]-fYlim[0];
-  float _fiducialFrac = (fFidVolCut) ? std::min(1., (dz*dy)/(1037.*230.) ) : 1.0;
-  // efficiency factor + error
-  float _effMC        = (fEfficiencyMC>0) ? fEfficiencyMC : 1.;
-  float _effMC_err    = (fEfficiencyMC>0) ? std::max(0.,fEfficiencyMC_err) : 0.;
+  float _fiducialFrac = (fFidVolCut) ? std::min(1., (dz*dy)/(1037.*233.) ) : 1.0;
   // Counters / maps / etc
   bool  _isMC           = false;
   int   _numEvents      = 0;
@@ -115,6 +121,7 @@
   std::map<int,std::vector<int>> _map_wire_clusters;
   std::vector<bool> wireIsNoisy (nWiresColl,false);
   std::vector<bool> wireIsBad   (nWiresColl,false);
+
   // Live time
   int   _minTick         = 0;
   int   _maxTick         = 6400 - (int)fdT_max*2;
@@ -123,7 +130,12 @@
   // Blip fidelity requirements
   int _betaMinPlanes = 2;
   int _betaMaxDiff = 9999;
+      
+  std::vector<bool> clust_isAlpha; //(nclusts,false);
+  std::vector<bool> clust_isBeta; //(nclusts,false);
+  std::vector<bool> clust_isGamma; //(nclusts,false);
 
+  TF1* f_backward_corr = new TF1("backward_corr","[0]+[1]*x",fdT_min,fdT_max);
 
   //##########################################################################
   // Functions and ROOT objects
@@ -131,7 +143,7 @@
   void                        makePlots();
   void                        makeHistograms();
   void                        setRootStyle();
-  std::vector<BiPoCandidate>  FindCandidates(int, int, bool, int&, int&);
+  std::vector<BiPoCandidate>  FindCandidates(int, int, int, bool, int&, int&, int&);
   FitResult                   fitdT(TH1D*,bool,bool);
   int                         FindG4Index(int);
   double                      calcActivity(double,double);
@@ -139,17 +151,25 @@
   // ROOT objects
   TTree*      fTree;
   TFile*      fOutFile;
-  
+
   // Histograms
   TDirectory* tdir_util;
   TDirectory* tdir_plots;
   TH1D* h_alpha_nwires;
   TH1D* h_nclusts_inwindow;
+  TH1D* h_nclusts_20us;
   TH1D* h_ncands_inwindow;
+  
   TH1D* h_cand_dT;
   TH1D* h_cand_dT_shift;
   TH1D* h_cand_dT_flip;
   TH1D* h_cand_dT_sub;
+  
+  TH1D* h_control_dT;
+  TH1D* h_control_dT_flip;
+  TH1D* h_control_dT_ratio;
+  TH1D* h_control_ratio;
+
   TH2D* h_wt_clusts;
   TH2D* h_wt_blips;
   TH2D* h_wt_blips_filt;
@@ -170,6 +190,14 @@
   TH1D* h_beta_charge;
   TH1D* h_beta_charge_bg;
   TH1D* h_beta_charge_sub;
+  
+  TH1D* h_alpha_energy;
+  TH1D* h_alpha_energy_bg;
+  TH1D* h_alpha_energy_sub;
+  TH1D* h_beta_energy;
+  TH1D* h_beta_energy_bg;
+  TH1D* h_beta_energy_sub;
+  
 
   TH1D* h_true_alpha_depne;
   TH1D* h_true_alpha_charge;
@@ -188,7 +216,8 @@
     //fOutTree ->SetBranchAddress("event_hr");
 
     h_alpha_nwires       = new TH1D("alpha_nwires","Candidate alpha clusters (coll plane);Wire extent",20,0,20);
-    h_nclusts_inwindow  = new TH1D("nclusts_inwindow","Number of clusters in time window following Bi-candidate",20,0,20);
+    h_nclusts_inwindow  = new TH1D("nclusts_inwindow","Mean clusters per wire in time window following Bi-candidate",50,0,5);
+    h_nclusts_20us      = new TH1D("nclusts_20us","Mean clusters per wire <20#mus following Bi-candidate",50,0,5);
     h_ncands_inwindow   = new TH1D("ncands_inwindow","Number of Po candidates in time window following Bi-candidate",10,0,10);
     
     float Zmin = -100;  float Zmax = 1100;  int Zbins = 600;
@@ -206,25 +235,43 @@
     h_wt_blips_filt ->SetOption("colz");
     h_wt_bipos      ->SetOption("colz");
    
-    int dTbins = (fdT_max) / fdT_binSize;
-    h_cand_dT       = new TH1D("cand_dT","Selected BiPo Candidates;Time difference [#mus];Candidates per second", dTbins,0.,fdT_max);
+    int dTbins = fdT_max / fdT_binSize;
+    h_cand_dT       = new TH1D("cand_dT","Selected BiPo Candidates;#DeltaT [#mus];Candidates per second / 20 #mus", dTbins,0.,fdT_max);
     h_cand_dT_shift = (TH1D*)h_cand_dT->Clone("cand_dT_shift"); h_cand_dT_shift ->SetTitle("Shifted-wire region candidates");
     h_cand_dT_flip  = (TH1D*)h_cand_dT->Clone("cand_dT_flip");  h_cand_dT_flip  ->SetTitle("Opposite dT candidates");
     h_cand_dT_sub   = (TH1D*)h_cand_dT->Clone("cand_dT_sub");   h_cand_dT_sub   ->SetTitle("Background-subtracted spectrum");
-    
+   
+    h_control_dT        = new TH1D("control_dT","OFFSET REGION;Time difference [#mus];Number of candidates", dTbins,0.,fdT_max);
+    h_control_dT_flip   = new TH1D("control_dT_flip","OFFSET REGION;Time difference [#mus];Number of candidates", dTbins,0.,fdT_max);
+    h_control_dT_ratio  = new TH1D("control_dT_ratio","OFFSET REGION;Time difference [#mus];Number of candidates", dTbins,0.,fdT_max);
+
     float alphaQmax   = fAlphaCharge_max; 
     int   alphaQbins  = alphaQmax/200.;
-    float betaQmax    = 80e3;
-    int   betaQbins   = 40;
-    h_alpha_charge      = new TH1D("alpha_charge","Candidate alphas;Collection Plane Charge [e];Events", alphaQbins, 0, alphaQmax);
+    float betaQmax    = fBetaCharge_max;
+    int   betaQbins   = betaQmax/2000;
+    h_alpha_charge      = new TH1D("alpha_charge","Candidate alphas;Collected charge [e^{-}];Entries per second", alphaQbins, 0, alphaQmax);
     h_alpha_charge_bg   = (TH1D*)h_alpha_charge->Clone("alpha_charge_bg");
     h_alpha_charge_sub  = (TH1D*)h_alpha_charge->Clone("alpha_charge_sub");
     h_alpha_charge_sub  ->SetTitle("Candidate alphas after background subtraction");
-    h_beta_charge       = new TH1D("beta_charge","Candidate betas;Collection Plane Charge [e];Events", betaQbins, 0, betaQmax);
+    h_beta_charge       = new TH1D("beta_charge","Candidate betas;Collected charge [e^{-}];Events", betaQbins, 0, betaQmax);
     h_beta_charge_bg    = (TH1D*)h_beta_charge->Clone("beta_charge_bg");
     h_beta_charge_sub   = (TH1D*)h_beta_charge->Clone("beta_charge_sub");
     h_beta_charge_sub   ->SetTitle("Candidate betas after background subtraction");
    
+    // E = (Q/R) * 23.6E-6 MeV
+    float alphaEmax   = fAlphaEnergy_max;
+    int alphaEbins    = fAlphaEnergy_max/0.01;
+    float betaEmax    = fBetaEnergy_max;
+    int   betaEbins   = fBetaEnergy_max/0.10;
+    h_alpha_energy      = new TH1D("alpha_energy","Candidate alphas;Electron-equivalent energy [MeVee];Entries per second", alphaEbins, 0, alphaEmax);
+    h_alpha_energy_bg   = (TH1D*)h_alpha_energy->Clone("alpha_energy_bg");
+    h_alpha_energy_sub  = (TH1D*)h_alpha_energy->Clone("alpha_energy_sub");
+    h_alpha_energy_sub  ->SetTitle("Candidate alphas after background subtraction");
+    h_beta_energy       = new TH1D("beta_energy","Candidate betas;Energy [MeV];Entries per second", betaEbins, 0, betaEmax);
+    h_beta_energy_bg    = (TH1D*)h_beta_energy->Clone("beta_energy_bg");
+    h_beta_energy_sub   = (TH1D*)h_beta_energy->Clone("beta_energy_sub");
+    h_beta_energy_sub   ->SetTitle("Candidate betas after background subtraction");
+
     int   timeBins  = binPeriodMax[fConfig]/binPeriodHrs[fConfig];
     float timeMax   = binPeriodMax[fConfig];
     h_time_vs_rate      = new TH1D("time_vs_rate",";Time [hr];Rate per 3.2 ms readout",timeBins,0,timeMax);
@@ -264,13 +311,17 @@
     _isMC           = inFile.isMC;
     
     printf("Reading input file: %s : %s\n",inFile.fileName.c_str(),inFile.treeName.c_str());
+    if( !_isMC ) chargeScaling = 1.0;
 
+    if( chargeScaling < 1. ) 
+      printf("WARNING: scalinig charge by %f\n",chargeScaling);
     // open the file and set up the TTree
     std::string   _fileName = "files/" + inFile.fileName;
     TFile* file = new TFile(_fileName.c_str(),"READ");
     fTree = (TTree*)file->Get(inFile.treeName.c_str());
   
     // set branches
+    fTree->SetBranchAddress("lifetime",&lifetime);
     fTree->SetBranchAddress("timestamp",&timestamp);
     fTree->SetBranchAddress("nclusts",&nclusts);                     
     fTree->SetBranchAddress("clust_nwires",&clust_nwires);
@@ -285,6 +336,7 @@
     fTree->SetBranchAddress("nblips",&nblips);                       
     fTree->SetBranchAddress("blip_nplanes",&blip_nplanes);
     fTree->SetBranchAddress("blip_sigmayz",&blip_sigmayz);
+    fTree->SetBranchAddress("blip_energy",&blip_energy);
     fTree->SetBranchAddress("blip_y",&blip_y);                        
     fTree->SetBranchAddress("blip_z",&blip_z);                        
     fTree->SetBranchAddress("blip_charge",&blip_charge);              
@@ -298,15 +350,15 @@
       fTree->SetBranchAddress("part_isPrimary",&part_isPrimary);
       fTree->SetBranchAddress("part_trackID",&part_trackID);
       fTree->SetBranchAddress("part_pdg",&part_pdg);
-      fTree->SetBranchAddress("part_startT",&part_startT);
+      //fTree->SetBranchAddress("part_startT",&part_startT);
       fTree->SetBranchAddress("edep_g4id",&edep_g4id);
       fTree->SetBranchAddress("edep_pdg",&edep_pdg);
       fTree->SetBranchAddress("edep_electrons",&edep_electrons);
       fTree->SetBranchAddress("edep_charge",&edep_charge);
       fTree->SetBranchAddress("edep_tdrift",&edep_tdrift);
-      fTree->SetBranchAddress("edep_x",&edep_x);
-      fTree->SetBranchAddress("edep_y",&edep_y);
-      fTree->SetBranchAddress("edep_z",&edep_z);
+      //fTree->SetBranchAddress("edep_x",&edep_x);
+      //fTree->SetBranchAddress("edep_y",&edep_y);
+      //fTree->SetBranchAddress("edep_z",&edep_z);
     }
 
     // make output file to store plots
@@ -320,7 +372,7 @@
     makeHistograms();
     
     // for picky blip mode, set proper restrictions
-    if( fPickyBlipMode ) {
+    if( fPickyBetaMode ) {
       _betaMinPlanes    = 3;      // Min number of matched planes (must be 2 or 3)
       _betaMaxDiff      = 1;      // Difference in wire intersection points [cm]
     } 
@@ -333,8 +385,6 @@
 
     for(auto iwire : fNoisyWires )  wireIsNoisy[iwire] = true;
     for(auto iwire : fBadWires )    wireIsBad[iwire] = true;
-
-
 
     // ****************************************************
     // Loop over the events
@@ -355,65 +405,63 @@
       
       // ..... quick-test options ...........
       //int maxEvt    = 1000; if(  iEvent >= maxEvt ) break;
-      //int sparsify  = 100; if(  (iEvent % sparsify) != 0 ) continue; 
+      //int sparsify  = 10; if(  (iEvent % sparsify) != 0 ) continue; 
       //..................................
 
       // Retrieve event info
       fTree->GetEntry(iEvent);
-      _numEvents++;
       
       // Record the event time relative to start of dataset period
       double eventHr = ( timestamp - inFile.t0 ) / 3600.;
       if( !_isMC && (eventHr < fMinHr || eventHr > fMaxHr) ) continue;
       h_time_vs_N->Fill(eventHr);
+      _numEvents++;
       
       // ===============================================================
       // Clear masks to track cluster availability to avoid double-counts
       // ===============================================================
       _clustAvailable.assign(nclusts, true);
-      
+  
       // ======================================
       // Check truth info
       // ======================================
-      std::vector<int> alpha_edeps;
-      std::vector<int> beta_edeps;
-      int alphaPDG = 1000020040;
-      for(int i=0; i<nedeps; i++){
-        int g4index = FindG4Index(edep_g4id[i]);
-        float q_dep   = edep_electrons[i];
-        float q_drift = edep_charge[i];
-        if( !part_isPrimary[g4index] ) continue;
-        if( edep_pdg[i] == alphaPDG ) {
-          if( q_drift > 0 ) h_true_alpha_charge ->Fill(q_drift/0.826);
-          if( q_dep > 0 )   h_true_alpha_depne  ->Fill(q_dep);
-          float driftTime = edep_tdrift[i];
-          float readoutTime = driftTime + part_startT[i];
-          int   readoutTick = readoutTime/fSamplePeriod;
-          if( readoutTick > _minTick && readoutTick < _maxTick ) 
-            _numBiPo_true_perfectReco++;
+        int alphaPDG = 1000020040;
+        for(int i=0; i<nedeps; i++){
+          int g4index = FindG4Index(edep_g4id[i]);
+          int   q_dep   = edep_electrons[i];
+          int   q_drift = edep_charge[i];
+          if( !part_isPrimary[g4index] ) continue;
+          if( edep_pdg[i] == alphaPDG ) {
+            if( q_drift > 0 ) h_true_alpha_charge ->Fill(q_drift/0.826);
+            if( q_dep > 0 )   h_true_alpha_depne  ->Fill(q_dep);
+            float driftTime = edep_tdrift[i];
+            float readoutTime = driftTime + part_startT[i];
+            int   readoutTick = readoutTime/fSamplePeriod;
+            if( readoutTick > _minTick && readoutTick < _maxTick ) 
+              _numBiPo_true_perfectReco++;
+          }
         }
-      }
       
       // look for collection plane clusts matched to an alpha
-      std::vector<bool> clust_isAlpha(nclusts,false);
-      std::vector<bool> clust_isBeta(nclusts,false);
-      std::vector<bool> clust_isGamma(nclusts,false);
-      for(int i=0; i < nclusts; i++){
-        if( clust_plane[i] != 2 ) continue;
-        int eid = clust_edepid[i];
-        if( eid < 0 ) continue;
-        int g4index = FindG4Index(edep_g4id[eid]);
-        if( part_isPrimary[g4index] ) {
-          if(part_pdg[g4index] == alphaPDG )  clust_isAlpha[i] = true;
-          if(part_pdg[g4index] == 11)         clust_isBeta[i]  = true;
-        } else {
-          if(part_pdg[g4index] == 11)         clust_isGamma[i] = true;
+        clust_isAlpha.assign(nclusts, false); 
+        clust_isBeta.assign(nclusts, false); 
+        clust_isGamma.assign(nclusts, false); 
+        for(int i=0; i < nclusts; i++){
+          if( clust_plane[i] != 2 ) continue;
+          int eid = clust_edepid[i];
+          if( eid < 0 ) continue;
+          int g4index = FindG4Index(edep_g4id[eid]);
+          if( part_isPrimary[g4index] ) {
+            if(part_pdg[g4index] == alphaPDG )  clust_isAlpha[i] = true;
+            if(part_pdg[g4index] == 11)         clust_isBeta[i]  = true;
+          } else {
+            if(part_pdg[g4index] == 11)         clust_isGamma[i] = true;
+          }
+          if( clust_isAlpha[i] ) h_matched_alpha_charge->Fill( clust_charge[i] );
+          // Option to ignore alpha blips for background assessment
+          if( fIgnoreTrueAlphas && clust_isAlpha[i] ) _clustAvailable[i] = false;
+          if( fIgnoreTrueGammas && clust_isGamma[i] ) _clustAvailable[i] = false;
         }
-        if( clust_isAlpha[i] ) h_matched_alpha_charge->Fill( clust_charge[i] );
-        // Option to ignore alpha blips for background assessment
-        if( fIgnoreTrueAlphas && clust_isAlpha[i] ) _clustAvailable[i] = false;
-        if( fIgnoreTrueGammas && clust_isGamma[i] ) _clustAvailable[i] = false;
-      }
 
 
 
@@ -423,11 +471,13 @@
       _map_wire_clusters.clear();
       for(int i=0; i < nclusts; i++){
         if( clust_plane[i] != 2 ) continue;
+        clust_charge[i] *= chargeScaling;
         for(int j=clust_startwire[i]; j<=clust_endwire[i]; j++)
           _map_wire_clusters[clust_wire[i]].push_back(i);
         h_wt_clusts->Fill(clust_wire[i],clust_time[i]);
       }
 
+      /*
       // ==============================================================
       // Create list of blip IDs sorted by charge
       // ==============================================================
@@ -443,13 +493,14 @@
         sortedBlips.push_back(leadID);
         flag[leadID] = true;
       }
+      */
       
-
       // ==============================================================
       // Loop over 3D blips...
       // ==============================================================
-      for(auto& iBlip : sortedBlips ) {
-     
+      //for(auto& iBlip : sortedBlips ) {
+      for(int iBlip=0; iBlip<nblips; iBlip++){
+
         // find associated cluster on collection
         int   ic    = blip_clustid[2][iBlip];
   
@@ -459,6 +510,27 @@
         // skip if this cluster was already included in a BiPo candidate 
         if( !_clustAvailable[ic] ) continue;
         
+        float corrFact    = 1.0;
+        corrFact    = exp(fAssumedTime/lifetime);
+        float beta_charge = clust_charge[ic]*corrFact;
+        float beta_energy = ( beta_charge / fRecomb ) * (23.6e-6);
+
+        // apply charge/size cuts on beta
+        if(   //clust_charge[ic] < fBetaCharge_min 
+          //||  
+          clust_charge[ic] > fBetaCharge_max ) continue;
+        
+        // blip plane-matching requirements
+        if( blip_nplanes[iBlip] < _betaMinPlanes ) continue;
+        if( blip_sigmayz[iBlip] > _betaMaxDiff ) continue;
+        
+        // evaluate if in fiducial volume
+        if( fFidVolCut ) {
+          if( blip_z[iBlip] < fZlim[0] || blip_z[iBlip] > fZlim[1] ) continue;
+          if( blip_y[iBlip] < fYlim[0] || blip_y[iBlip] > fYlim[1] ) continue;
+        }
+       
+
   			// skip if any wire in cluster is from a noisy wire
         // skip if this cluster is at the very edge of the wireplane
         int w_start = std::max(0,clust_startwire[ic]-1);
@@ -472,27 +544,17 @@
           }
         }
         if( flag ) continue;
-        
-
-        // 3D match cuts for beta
-        if( blip_nplanes[iBlip] < _betaMinPlanes ) continue;
-        if( blip_sigmayz[iBlip] > _betaMaxDiff ) continue;
-        
-
-        // apply charge/size cuts on beta
-        if(   clust_charge[ic] < fBetaCharge_min 
-          ||  clust_charge[ic] > fBetaCharge_max ) continue;
-        
-        // skip if adjacent wires are missing
-        if( wireIsBad[clust_wire[ic]+1] ) continue;
-        if( wireIsBad[clust_wire[ic]-1] ) continue;
        
-        // evaluate if in fiducial volume
-        if( fFidVolCut ) {
-          if( blip_z[iBlip] < fZlim[0] || blip_z[iBlip] > fZlim[1] ) continue;
-          if( blip_y[iBlip] < fYlim[0] || blip_y[iBlip] > fYlim[1] ) continue;
-        }
-        
+        // require semi-isolation (no other clusters within +/-20us)
+        for(int iwire = w_start; iwire <= w_end; iwire++){
+          for(auto& jc : _map_wire_clusters[iwire] ) {
+            if( ic == jc ) continue;
+            float dt = fabs(clust_time[jc]-clust_time[ic]);
+            if( dt < 20 ) {flag = true; break;}
+          }
+        } 
+        if( flag ) continue;
+
         // fill some blip/cluster location histograms
         h_wt_blips_filt->Fill( clust_wire[ic], clust_time[ic] );
       
@@ -501,36 +563,48 @@
         if( peakT < 0 )         continue;
         if( peakT > _maxTick )  continue;
         if( peakT < _minTick )  continue; 
+        
+
 
         // ------------------------------------------------------------
         // Begin search for alpha candidates
         // ------------------------------------------------------------
         int nclusts_inwindow        = 0;
-        int nclusts_inwindow_shift  = 0;
-        int nclusts_inwindow_shift2 = 0;
+        int nclusts_20us            = 0;
 
         // Search for standard candidates first
         int nwires = 0;
-        std::vector<BiPoCandidate> v_cands = FindCandidates(ic, 0, false, nclusts_inwindow,nwires);
-        h_nclusts_inwindow->Fill(nclusts_inwindow);
+        std::vector<BiPoCandidate> v_cands = FindCandidates(ic, 0, fWireRange, false, nclusts_inwindow,nclusts_20us,nwires);
+        h_nclusts_inwindow->Fill(float(nclusts_inwindow)/nwires);
+        h_nclusts_20us->Fill(float(nclusts_20us)/nwires);
         h_ncands_inwindow->Fill((int)v_cands.size());
         
-        // Search for background candidates (wire shift)
-        int nwires_shift = 0;
-        int shift = 2*fWireRange+1;
-        std::vector<BiPoCandidate> v_cands_shift = FindCandidates(ic,shift,false,nclusts_inwindow_shift,nwires_shift);
-
-        // Search for background candidates (same wire, but dT-flip)
-        int nclusts_inwindow_flip;
-        int nwires_flip = 0;
-        std::vector<BiPoCandidate> v_cands_flip = FindCandidates(ic, 0, true, nclusts_inwindow_flip,nwires_flip);
-     
-
-        // --------------------------------------------
+        int ngood = 0;
+        for(auto& thisCand : v_cands) {
+          _clustAvailable[ic] = false;
+          _clustAvailable[thisCand.id2] = false;
+          if( thisCand.dT < fdT_min ) continue;
+          h_beta_charge         ->Fill(thisCand.q1);
+          h_beta_energy         ->Fill(thisCand.e1);
+          h_alpha_charge        ->Fill(thisCand.q2);
+          h_alpha_energy        ->Fill(thisCand.e2);
+          if( thisCand.q1 < fBetaCharge_min ) continue;
+          ngood++;
+          h_zy_bipos->Fill( blip_z[iBlip], blip_y[iBlip]);
+          h_wt_bipos->Fill( clust_wire[ic], clust_time[ic]);
+          h_cand_dT             ->Fill(thisCand.dT);
+          h_2D_time_vs_dT       ->Fill(eventHr,thisCand.dT);
+          h_alpha_nwires        ->Fill(clust_nwires[thisCand.id2]);
+        }
+        if( ngood ) {
+            _numBiPo++;
+            if( clust_isBeta[ic] ) _numBiPo_mcmatch++;
+        }
+        
+        /*
         // Evaluate standard candidates
-        // ---------------------------------------------
-        if( v_cands.size() && v_cands.size() <= fMaxCands && nclusts_inwindow <=  fMaxClustMult ) {
-          
+        if( v_cands.size() ) {
+           
           // flag this beta candidate as unavailable
           _clustAvailable[ic] = false;
           
@@ -538,7 +612,8 @@
           std::vector<BiPoCandidate> v_cands_dtcut;
           for(auto& thisCand : v_cands) {
             _clustAvailable[thisCand.id2] = false;
-            if( thisCand.dT > fdT_min ) v_cands_dtcut.push_back( thisCand );
+            if( thisCand.dT < fdT_min ) continue;
+            v_cands_dtcut.push_back( thisCand );
           }
           
           
@@ -548,37 +623,69 @@
             // plot locations
             h_zy_bipos->Fill( blip_z[iBlip], blip_y[iBlip]);
             h_wt_bipos->Fill( clust_wire[ic], clust_time[ic]);
-            float weight = 1./v_cands_dtcut.size();
+            //float weight = 1./v_cands_dtcut.size();
             for(auto& thisCand : v_cands_dtcut) {
-              h_beta_charge         ->Fill(thisCand.q1,weight);
-              h_alpha_charge        ->Fill(thisCand.q2,weight);
-              h_cand_dT             ->Fill(thisCand.dT,weight);
-              h_2D_time_vs_dT       ->Fill(eventHr,thisCand.dT,weight);
-              h_alpha_nwires        ->Fill(clust_nwires[thisCand.id2],weight);
+              //h_beta_ratio          ->Fill(thisCand.beta_ratio);
+              h_beta_charge         ->Fill(thisCand.q1);
+              h_beta_energy         ->Fill(thisCand.e1);
+              h_alpha_charge        ->Fill(thisCand.q2);
+              h_alpha_energy        ->Fill(thisCand.e2);
+              h_cand_dT             ->Fill(thisCand.dT);
+              h_2D_time_vs_dT       ->Fill(eventHr,thisCand.dT);
+              h_alpha_nwires        ->Fill(clust_nwires[thisCand.id2]);
             }
           }
         }//end evaluation of standard cands
+        */
+       
+        // Search for candidates in control region shifted +5 wires away
+        int a, b, n;
+        std::vector<BiPoCandidate> v_control      = FindCandidates(ic, 5, 2, false, a, b, n );
+        std::vector<BiPoCandidate> v_control_flip = FindCandidates(ic, 5, 2, true, a, b, n );
+        for( auto& vc : v_control )       {
+          if( vc.q1 > fBetaCharge_min ) h_control_dT      ->Fill( vc.dT );
+        }
+        for( auto& vc : v_control_flip )  {
+          if( vc.q1 > fBetaCharge_min ) h_control_dT_flip ->Fill( vc.dT );
+        }
+        
+        // Search for background candidates (wire shift)
+        int nwires_shift = 0;
+        int shift = 2*fWireRange+1;
+        int nclusts_inwindow_shift  = 0;
+        int nclusts_20us_shift      = 0;
+        std::vector<BiPoCandidate> v_cands_shift = FindCandidates(ic,shift,fWireRange,false,nclusts_inwindow_shift,nclusts_20us_shift,nwires_shift);
+
+        // Search for background candidates (same wire, but dT-flip)
+        int nclusts_inwindow_flip;
+        int nclusts_20us_flip;
+        int nwires_flip = 0;
+        std::vector<BiPoCandidate> v_cands_flip = FindCandidates(ic,0, fWireRange, true, nclusts_inwindow_flip,nclusts_20us_flip,nwires_flip);
+
+
        
 
         // --------------------------------------------
         // Evaluate wire shift candidates
         // ---------------------------------------------
-        if( v_cands_shift.size() && v_cands_shift.size()<=fMaxCands && nclusts_inwindow_shift <=  fMaxClustMult ) {
+        if(     v_cands_shift.size() ) {
 
           std::vector<BiPoCandidate> v_cands_dtcut;
           for(auto& thisCand : v_cands_shift) {
-            if( thisCand.dT >= fdT_min ) v_cands_dtcut.push_back( thisCand );
+            if( thisCand.dT > fdT_min ) v_cands_dtcut.push_back( thisCand );
           }
           
           if( v_cands_dtcut.size() ) {
-            float weight_n = nwires/float(nwires_shift);
-            float weight = weight_n/v_cands_dtcut.size();
+            //float weight_n = nwires/float(nwires_shift);
+            //float weight = weight_n/v_cands_dtcut.size();
             for(auto& thisCand : v_cands_dtcut) {
-              h_cand_dT_shift->Fill(thisCand.dT,weight);
+              h_cand_dT_shift->Fill(thisCand.dT);
               if( fBackgroundMode == 0 ) {
-                h_2D_time_vs_dT_bg       ->Fill(eventHr,thisCand.dT,weight);
-                h_beta_charge_bg         ->Fill(thisCand.q1,weight);
-                h_alpha_charge_bg        ->Fill(thisCand.q2,weight);
+                h_2D_time_vs_dT_bg       ->Fill(eventHr,thisCand.dT);
+                h_beta_charge_bg         ->Fill(thisCand.q1);
+                h_beta_energy_bg         ->Fill(thisCand.e1);
+                h_alpha_charge_bg        ->Fill(thisCand.q2);
+                h_alpha_energy_bg        ->Fill(thisCand.e2);
               }
             }
           }
@@ -587,25 +694,46 @@
         // --------------------------------------------
         // Evaluate dT-flip candidates
         // ---------------------------------------------
-        if( v_cands_flip.size() && v_cands_flip.size() <= fMaxCands && nclusts_inwindow_flip <=  fMaxClustMult ) {
+        for(auto& thisCand : v_cands_flip) {
+          _clustAvailable[ic] = false;
+          _clustAvailable[thisCand.id2] = false;
+          if( thisCand.dT < fdT_min ) continue;
+          if( fBackgroundMode == 1 ) {
+            h_beta_charge_bg         ->Fill(thisCand.q1);
+            h_beta_energy_bg         ->Fill(thisCand.e1);
+            h_alpha_charge_bg        ->Fill(thisCand.q2);
+            h_alpha_energy_bg        ->Fill(thisCand.e2);
+          }
+          if( thisCand.q1 < fBetaCharge_min ) continue;
+          h_cand_dT_flip             ->Fill(thisCand.dT);
+          if( fBackgroundMode == 1 )
+            h_2D_time_vs_dT_bg    ->Fill(eventHr,thisCand.dT);
+        }
+
+        /*
+        if(     v_cands_flip.size() ) {
           std::vector<BiPoCandidate> v_cands_dtcut;
           for(auto& thisCand : v_cands_flip) {
             _clustAvailable[thisCand.id2] = false;
-            if( thisCand.dT >= fdT_min ) v_cands_dtcut.push_back( thisCand );
+            if( thisCand.dT > fdT_min ) v_cands_dtcut.push_back( thisCand );
           }
           
           if( v_cands_dtcut.size() ) {
-            float weight = 1./v_cands_dtcut.size();
+            //float weight = 1./v_cands_dtcut.size();
             for(auto& thisCand : v_cands_dtcut) {
-              h_cand_dT_flip->Fill(thisCand.dT,weight);
+              h_cand_dT_flip->Fill(thisCand.dT);
               if( fBackgroundMode == 1 ) {
-                h_2D_time_vs_dT_bg       ->Fill(eventHr,thisCand.dT,weight);
-                h_beta_charge_bg         ->Fill(thisCand.q1,weight);
-                h_alpha_charge_bg        ->Fill(thisCand.q2,weight);
+                h_2D_time_vs_dT_bg       ->Fill(eventHr,thisCand.dT);
+                h_beta_charge_bg         ->Fill(thisCand.q1);
+                h_alpha_charge_bg        ->Fill(thisCand.q2);
+                h_beta_energy_bg         ->Fill(thisCand.e1);
+                h_alpha_energy_bg        ->Fill(thisCand.e2);
+                //h_beta_ratio_bg          ->Fill(thisCand.beta_ratio);
               }
             }
           }
         }
+        */
       
 
       }//end loop over 3D blips
@@ -613,22 +741,41 @@
     }//endloop over events
     double loopDuration = ( time(NULL) - loopStart );
 
-   
+
+    // Control region ratio: ratio of forward to backward
+    
+
     // ***************************************************
-    // Scale everything so it's 'per second in AV'
+    // Scale everything so it's 'per second in full AV'
     // ***************************************************
     _totalLiveTime = float(_numEvents) * _liveTimePerEvt;
     float scaleFact = (1./_totalLiveTime)*(1./_fiducialFrac);
-    h_cand_dT           ->Scale( scaleFact );
-    h_cand_dT_shift     ->Scale( scaleFact );
-    h_cand_dT_flip      ->Scale( scaleFact );
-    h_2D_time_vs_dT     ->Scale( scaleFact );
-    h_2D_time_vs_dT_bg  ->Scale( scaleFact );
+    h_cand_dT           ->Scale( scaleFact); //, "width");
+    h_cand_dT_shift     ->Scale( scaleFact); // "width");
+    h_cand_dT_flip      ->Scale( scaleFact); //, "width");
+    //h_2D_time_vs_dT     ->Scale( scaleFact );
+    //h_2D_time_vs_dT_bg  ->Scale( scaleFact );
+    
+    std::cout<<"Total live time: "<<_totalLiveTime<<"\n";
+    std::cout<<"Fiducial fraction: "<<_fiducialFrac<<"\n";
+    std::cout<<"Scale factor: "<<scaleFact<<"\n";
     
     h_alpha_charge      ->Scale( scaleFact );
-    h_beta_charge       ->Scale( scaleFact );
     h_alpha_charge_bg   ->Scale( scaleFact );
+    h_alpha_energy      ->Scale( scaleFact );
+    h_alpha_energy_bg   ->Scale( scaleFact );
+    h_beta_charge       ->Scale( scaleFact );
     h_beta_charge_bg    ->Scale( scaleFact );
+    h_beta_energy       ->Scale( scaleFact );
+    h_beta_energy_bg    ->Scale( scaleFact );
+    
+    // Keep sum squares
+    h_control_dT        ->Sumw2();
+    h_control_dT_flip   ->Sumw2();
+    h_control_dT_ratio  ->Divide(h_control_dT,h_control_dT_flip);
+    h_control_dT_ratio  ->Fit(f_backward_corr,"R");
+    if( fLinearizeCorr )  h_cand_dT_flip->Multiply( f_backward_corr );
+    else                  h_cand_dT_flip->Multiply( h_control_dT_ratio );
    
     // ***************************************************
     // Histogram subtraction time!
@@ -636,7 +783,10 @@
     h_cand_dT_sub         ->Add(h_cand_dT,        1);
     h_alpha_charge_sub    ->Add(h_alpha_charge,   1);
     h_beta_charge_sub     ->Add(h_beta_charge,    1);
-   
+    h_alpha_energy_sub    ->Add(h_alpha_energy,   1);
+    h_beta_energy_sub     ->Add(h_beta_energy,    1);
+    //h_beta_ratio_sub      ->Add(h_beta_ratio,     1);
+
     switch(fBackgroundMode){
       case 0: h_cand_dT_sub->Add(h_cand_dT_shift,-1.); break;
       case 1: h_cand_dT_sub->Add(h_cand_dT_flip,-1.); break;
@@ -644,6 +794,9 @@
 
     h_alpha_charge_sub->Add(h_alpha_charge_bg,-1.);
     h_beta_charge_sub->Add(h_beta_charge_bg,-1.);
+    h_alpha_energy_sub->Add(h_alpha_energy_bg,-1.);
+    h_beta_energy_sub->Add(h_beta_energy_bg,-1.);
+    //h_beta_ratio_sub->Add(h_beta_ratio_bg,-1.);
 
     // ***************************************************
     // Write all histos currently in stack
@@ -657,7 +810,7 @@
     printf("Total live time     : %f sec\n",  _totalLiveTime);
     printf("Live time per evt   : %f us\n",   _liveTimePerEvt*1e6);
     printf("Fiducial fraction   : %f\n",      _fiducialFrac); 
-    printf("dT min/max          : %.2f-%.2f us\n",  fdT_min,fdT_max);
+    printf("dT min/max          : %.2f-%.2f us\n", fdT_min,fdT_max);
     printf("Ave cands / evt     : %f\n",h_cand_dT->GetEntries()/(float)_numEvents );
     printf("  - truth-matched   : %f\n",_numBiPo_mcmatch/(float)_numEvents );
     printf("BG subtrctn method  : %i\n",fBackgroundMode);
@@ -677,7 +830,8 @@
   //#################################################################################
   void makePlots()
   {
-
+    
+    std::cout<<"MAKING PLOTS "<<_isMC<<"\n";
     // Histograms needed:
     //   - h_cand_dT_sub
     //   - h_2D_time_vs_dT
@@ -704,23 +858,25 @@
       TH1D* h_bg;
       int nbins = h_time_vs_N->GetXaxis()->GetNbins();
       for(int i=1; i<=nbins; i++){
-        //std::cout<<"SLICE "<<i<<"   \n";
         h_slice     = Make1DSlice( h_2D_time_vs_dT, i, i, Form("time_vs_dT_%i",i) );
-        h_bg    = Make1DSlice( h_2D_time_vs_dT_bg, i, i, Form("time_vs_dT_flip_%i",i) );
-        //float scaleFact = 1./float(h_time_vs_N->GetBinContent(i)*_liveTimePerEvt)*(1./_fiducialFrac);
-        //h_slice->Scale(scaleFact);
-        //h_bg->Scale(scaleFact);
-        h_slice->Add( h_bg, -1. );
-        float t = h_time_vs_N->GetXaxis()->GetBinCenter(i);
-        float dt = h_time_vs_N->GetXaxis()->GetBinWidth(i)/sqrt(12);
-        FitResult fr = fitdT(h_slice,false,false);
+        h_bg        = Make1DSlice( h_2D_time_vs_dT_bg, i, i, Form("time_vs_dT_flip_%i",i) );
+        double liveTime   = h_time_vs_N->GetBinContent(i)*_liveTimePerEvt;
+        float scaleFact = (1./liveTime)*(1./_fiducialFrac);
+        h_slice ->Scale(scaleFact);//, "width");
+        h_bg    ->Scale(scaleFact);//, "width");
+        if( fLinearizeCorr )  h_bg->Multiply( f_backward_corr );
+        else                  h_bg->Multiply( h_control_dT_ratio );
+        h_slice ->Add( h_bg, -1. );
+        
+        //tdir_util->cd();
+        FitResult fr = fitdT(h_slice,true,false);
         if( fr.rate_signal != -9 ) {
           h_time_vs_activity  ->SetBinContent(  i,  fr.activity);
           h_time_vs_activity  ->SetBinError(    i,  fr.activity_err);
           h_time_vs_rate      ->SetBinContent(  i,  fr.rate_signal);
           h_time_vs_rate      ->SetBinError(    i,  fr.rate_signal_err);
-          h_time_vs_rate_bg   ->SetBinContent(  i,  fr.rate_bg);
-          h_time_vs_rate_bg   ->SetBinError(    i,  fr.rate_bg_err);
+          h_time_vs_rate_bg   ->SetBinContent(  i,  fr.N_bg);
+          h_time_vs_rate_bg   ->SetBinError(    i,  fr.N_bg_err);
           h_time_vs_p0        ->SetBinContent(  i,  fr.p0);
           h_time_vs_p0        ->SetBinError(    i,  fr.p0_err);
           h_time_vs_p1        ->SetBinContent(  i,  fr.p1);
@@ -741,11 +897,11 @@
       // ============================================
       // Plot fit parameters vs time
       // ============================================
-      TH1D* h_p0  = h_time_vs_rate_bg; //h_time_vs_p0;
-      TH1D* h_p1  = h_time_vs_rate; //h_time_vs_p1;
+      TH1D* h_p0  = h_time_vs_p0; //h_time_vs_rate_bg; //h_time_vs_p0;
+      TH1D* h_p1  = h_time_vs_p1; //h_time_vs_rate; //h_time_vs_p1;
       FormatTH1D(h_p1, kBlue, 1, 2, 20, 1);
       FormatTH1D(h_p0, kRed, 1, 2, 20, 1);
-      name = "c_time_vs_rate";
+      name = "c_time_vs_params";
       min = std::min(GetHistMin(h_p0),GetHistMin(h_p1));
       max = std::max(GetHistMax(h_p0),GetHistMax(h_p1));
       range = (max-min);
@@ -759,40 +915,35 @@
       h_p0->DrawCopy();
       h_p1->DrawCopy("same");
       
-      tdir_plots->cd();
+      //tdir_plots->cd();
       c->Write();
 
 
       // ============================================
       // Plot BiPo rate vs time
       // ============================================
-      TH1D* h1  = h_time_vs_rate;
-      FormatTH1D(h1, kBlue+2, 1, 2, 20, 1);
-   
       name = "c_time_vs_rate";
-      range = (GetHistMax(h1)-GetHistMin(h1));
-      TCanvas* c2 = new TCanvas(name.c_str(),name.c_str(),500,380);
+      TCanvas* c2 = new TCanvas(name.c_str(),name.c_str(),550,400);
       gStyle->SetOptStat(0);
       gPad->SetGridy(1);
-      //h1->GetYaxis()->SetRangeUser(GetHistMin(h1)-0.3*range, GetHistMax(h1)+0.5*range);
+      TH1D* h1  = h_time_vs_rate;
+      FormatTH1D(h1, kBlue, 1, 1, 20, 0.7);
+      FormatAxes(h1, 0.05, 0.045, 1.1, 1.1);
       h1->GetYaxis()->SetTitleOffset(1.1); 
-      h1->GetYaxis()->SetTitle("Decay candidates per 3.2ms readout");
+      h1->GetYaxis()->SetTitle("Candidates per 3.2 ms readout");
       h1->DrawCopy();
       c2->Write();
       
       // ============================================
       // Plot activity vs time
       // ============================================
-      TH1D* h2  = h_time_vs_activity;
-      FormatTH1D(h2, kBlack, 1, 2, 20, 1);
-   
       name = "c_time_vs_activity";
-      range = (GetHistMax(h2)-GetHistMin(h2));
-      TCanvas* c3 = new TCanvas(name.c_str(),name.c_str(),500,380);
+      TCanvas* c3 = new TCanvas(name.c_str(),name.c_str(),550,400);
       gStyle->SetOptStat(0);
       gPad->SetGridy(1);
-      //h1->GetYaxis()->SetRangeUser(GetHistMin(h1)-0.3*range, GetHistMax(h1)+0.5*range);
-      h2->GetYaxis()->SetTitleOffset(1.3); 
+      TH1D* h2 = h_time_vs_activity;
+      FormatTH1D(h2, kBlack, 1, 1, 20, 0.7);
+      FormatAxes(h2, 0.05, 0.045, 1.1, 1.1);
       h2->GetYaxis()->SetTitle("Equivalent activity [mBq/kg]");
       h2->DrawCopy();
       c3->Write();
@@ -803,10 +954,14 @@
     // ============================================
     // Do final fit on dT spectrum
     // ============================================
-    h_cand_dT_sub->GetXaxis()->SetTitle("#DeltaT [#mus]");
-    h_cand_dT_sub->GetYaxis()->SetTitle("Decay candidates per sec");
-    fitdT( h_cand_dT_sub, false, true );
-    fitdT( h_cand_dT_sub, false, false );
+    TH1D* h3  = h_cand_dT_sub;
+    h3->GetXaxis()->SetTitle("#DeltaT [#mus]");
+    h3->GetYaxis()->SetTitle("Candidates per second / 20 #mus");
+    FormatTH1D(h3, kBlue+2, 1, 1, 21, 0.5);
+    FormatAxes(h3, 0.05, 0.045, 1.1, 1.1);
+    //fitdT( h3, false, true );
+    tdir_plots->cd();
+    fitdT( h3, true, false );
 
   } 
   
@@ -818,19 +973,19 @@
   FitResult fitdT(TH1D* h, bool writeCanvas = false, bool constrainNorm = false ){
     
     std::cout
-    <<"\n\nFitting dT spectrum "<<h->GetTitle()<<", "<<h->GetEntries()<<"\n"
-    <<"Constraining BiPo normalization? "<<constrainNorm<<"\n";
+    <<"\n\nFitting dT spectrum "<<h->GetTitle()<<", "<<h->GetEntries()<<"\n";
   
     FitResult out;
   
     std::string label = h->GetName();
     TCanvas* c = new TCanvas(Form("c_fit_%s",label.c_str()),Form("c_fit_%s",label.c_str()),500,420);
     //gPad->SetMargin(mar_l, mar_r, mar_b, mar_t ); 
-    TH1D* hc = (TH1D*)h->Clone();
-    float histMax = GetHistMax(hc);
-    float histMin = GetHistMin(hc);
+    float histMax = GetHistMax(h);
+    float histMin = GetHistMin(h);
     float range   = (histMax-histMin);
-   
+    
+    TGraphErrors* gr = MakeGraph(h);
+    
     /*
     // Define fit function, initialize parameters
     TF1* fit = new TF1("FullFit","[0] + [1]*exp(-x/[2]) + [3]*exp(-x/[4])",fdT_min,fdT_max);
@@ -847,56 +1002,62 @@
 
     // Define single exp fit + flat BG
     TF1* fit = new TF1("FullFit","[0] + [1]*exp(-x/[2])",fdT_min,fdT_max);
-    fit->SetParameter(0, 0. );
-    fit->SetParameter(1, (histMax-histMin)/2 );
-    if( constrainNorm ) fit->SetParLimits(1, 0., histMax+range);
+    fit->SetParameter(0, (histMax+histMin)/2 );
+    fit->SetParameter(1, (histMax-histMin) );
+    if( constrainNorm ) {
+      fit->SetParLimits(1, 0., 100.);
+    }
     fit->FixParameter(2, 164.3 );
-  
+
     // Draw plot and fit
     c->cd();
-    hc->Fit(fit,"RE"); // "WL" = log likelihood w/ weighted bins
-   
+    gr->Fit(fit,"RE");
+  
+    /*
     bool isAtLimit = gMinuit->fLimset;
     std::cout<<"Is MINUIT reaching limit? "<<gMinuit->fLimset<<"\n";
 
-    // For more accurate error, let normalization dip below
-    // zero and re-fit. Add the difference between this and
-    // the constrained fit in quadrature with the previous error.
-    // This can be considered a systematic.
-    /*
     if( isAtLimit && constrainNorm ) {
-      std::cout<<"Par1: "<<fit->GetParameter(1)<<" +/- "<<fit->GetParError(1)<<"\n";
+      float p1      = fit->GetParameter(1);
+      float p1_err  = fit->GetParError(1);
+      std::cout<<"Par1: "<<p1<<" +/- "<<p1_err<<"\n";
+      std::cout<<"Histogram range: "<<range<<"\n";
+      if( p1_err > range ) {
+        std::cout<<"!!! error is beyond range of histogram, so probably bad !!!\n";
+        p1_err = 0;
+      }
       TF1* fit2 = (TF1*)fit->Clone("FullFit2");
       fit2->FixParameter(0,fit->GetParameter(0)-fit->GetParError(0));
       hc->Fit(fit2,"REN");
-      double norm1 = fit->GetParameter(1);
-      double norm2 = fit2->GetParameter(1);
-      double diff = fabs(norm2-norm1);
-      double err = sqrt( pow( diff, 2) + pow( fit2->GetParError(1),2 ) );
-      std::cout<<"new norm: "<<norm2<<" +/- "<<fit2->GetParError(1) <<"\n"; 
+      double newp1 = fit2->GetParameter(1);
+      double diff = fabs(p1 - newp1);
+      double err = sqrt( pow(p1_err,2) + pow(diff,2) );
+      std::cout<<"new norm: "<<newp1<<" +/- "<<fit2->GetParError(1) <<"\n"; 
+      std::cout<<"Re-assigning fit error: "<<err<<"\n";
       fit->SetParError(1,err);
-      
-      std::cout<<"new par1: "<<fit->GetParameter(1)<<" +/- "<<fit->GetParError(1)<<"\n";
-      TF1* fit2 = (TF1*)fit->Clone("FullFit2");
-      fit2->ReleaseParameter(1);
-      hc->Fit(fit2,"REN");
-      double norm1 = fit->GetParameter(1);
-      double norm2 = fit2->GetParameter(1);
-      double diff = fabs(norm2-norm1);
-      double err = sqrt( pow( diff, 2) + pow( fit2->GetParError(1),2 ) );
-      std::cout<<"new norm: "<<norm2<<" +/- "<<fit2->GetParError(1) <<"\n"; 
-      fit->SetParError(1,err);
-
+     
+      //std::cout<<"new par1: "<<fit->GetParameter(1)<<" +/- "<<fit->GetParError(1)<<"\n";
+      //TF1* fit2 = (TF1*)fit->Clone("FullFit2");
+      //fit2->ReleaseParameter(1);
+      //hc->Fit(fit2,;
+      //double norm1 = fit->GetParameter(1);
+      //double norm2 = fit2->GetParameter(1);
+      //double diff = fabs(norm2-norm1);
+      //double err = sqrt( pow( diff, 2) + pow( fit2->GetParError(1),2 ) );
+      //std::cout<<"new norm: "<<norm2<<" +/- "<<fit2->GetParError(1) <<"\n"; 
+      //fit->SetParError(1,err);
     }
     */
 
 
-    hc->DrawCopy();
+    //hc->DrawCopy();
+    gr->Draw("AP");
     gStyle->SetOptFit(1112);
-    gPad->Modified(); gPad->Update();
+    //gPad->Modified(); gPad->Update();
     if( writeCanvas ) {
+      //hc->Write(0, TObject::kOverwrite );
       tdir_util->cd();
-      hc->Write(0, TObject::kOverwrite );
+      gr->Write(label.c_str());
       tdir_plots->cd();
       c->Write();
       fOutFile->cd();
@@ -911,53 +1072,80 @@
     f_flat->FixParameter(0, fit->GetParameter(0));
   
     // Full extrapolated BiPo component; integral of A*exp(-x/B) from 0-infinity is A*B
-    double A       = fit->GetParameter(1);
-    double dA      = fit->GetParError(1);
-    double B       = fit->GetParameter(2);
-    double n_bipo  = (A*B)/fdT_binSize;
-    double n_bipo_err = (dA*B)/fdT_binSize;
-
+    double p0       = fit->GetParameter(0);
+    double p0_err   = fit->GetParError(0);
+    double p1       = fit->GetParameter(1);
+    double p1_err   = fit->GetParError(1);
+    double tau      = fit->GetParameter(2);
+    double chi2ndf  = fit->GetChisquare()/fit->GetNDF();
+    double n_bipo   = (p1*tau)/fdT_binSize;
+    double n_bipo_err = (p1_err*tau)/fdT_binSize;
+    
     // Components within the dT selection window
-    double N_total  = hc    ->Integral(1,hc->GetXaxis()->GetNbins());
-    double N_bipo   = f_bipo->Integral(fdT_min,fdT_max)/fdT_binSize;
-    double N_bg     = f_flat->Integral(fdT_min,fdT_max)/fdT_binSize;
-    double N_bg_err = f_flat->IntegralError(fdT_min,fdT_max)/fdT_binSize;
+    double N_total    = h ->Integral(1,h->GetXaxis()->GetNbins());
+    double N_bipo     = f_bipo->Integral(fdT_min,fdT_max)/fdT_binSize;
+    double N_bipo_err = f_bipo->IntegralError(fdT_min,fdT_max)/fdT_binSize;
+    double N_bg       = f_flat->Integral(fdT_min,fdT_max)/fdT_binSize;
+    double N_bg_err   = f_flat->IntegralError(fdT_min,fdT_max)/fdT_binSize;
+    
+    // As extra systematic, fit the flat comp to zero
+    std::cout<<"Re-fitting with flat component set to 0:\n";
+    fit->FixParameter(0,0);
+    gr->Fit(fit,"QN");
+    double n2 = (fit->GetParameter(1)*fit->GetParameter(2))/fdT_binSize;
+    double n_bipo_syst = fabs(n_bipo-n2);
+    std::cout<<"Nom rate: "<<n_bipo<<"\n";
+    std::cout<<"Syst diff: "<<n_bipo_syst<<"\n";
+   
+    // efficiency factor + error
+    float effMC        = (fEfficiencyMC>0) ? fEfficiencyMC : 1.;
+    float effMC_syst    = (fEfficiencyMC>0) ? std::max(0.,fEfficiencyMC_err) : 0.;
   
     // Error terms for specific activity calculation
-    double err1 = (n_bipo!=0) ? n_bipo_err/n_bipo : 0.;
-    double err2 = (_effMC>0) ? _effMC_err/_effMC : 0.;
+    double err1   = (n_bipo!=0) ? fabs(n_bipo_err/n_bipo) : 0.;
+    double err2a  = (n_bipo!=0) ? fabs(n_bipo_syst/n_bipo) : 0.;
+    //double err2a  = 0;
+    double err2b  = (effMC>0) ? effMC_syst/effMC : 0.;
 
-    double activity_mBq     = 1e3 * (1./_effMC) * n_bipo / 85000.; 
-    double activity_mBq_err = fabs(activity_mBq) * sqrt( pow(err1,2) + pow(err2,2) ); 
-
+    double activity       = calcActivity(n_bipo,effMC);
+    double activity_err   = fabs(activity) * err1;
+    double activity_syst  = fabs(activity) * sqrt( pow(err2a,2) + pow(err2b,2) );
+    double activity_errTot = sqrt( pow(activity_err,2) + pow(activity_syst,2) );
+    
     // normalize "rate" to be per 3.2ms readout
-    double rate_norm_factor = 0.0032;
-    n_bipo *= rate_norm_factor;
-    n_bipo_err *= rate_norm_factor;
+    n_bipo      *= 0.0032;
+    n_bipo_err  *= 0.0032;
+    n_bipo_syst *= 0.0032;
+    N_bg        *= 0.0032;
+    N_bg_err    *= 0.0032;
     
     printf("================ dT fit =================\n");
-    printf("p0                  : %f +/- %f\n", fit->GetParameter(0),fit->GetParError(0));
-    printf("p1                  : %f +/- %f\n", fit->GetParameter(1),fit->GetParError(1));
-    printf("p2                  : %f +/- %f\n", fit->GetParameter(2),fit->GetParError(2));
-    printf("Chi2/ndf            : %f\n",        fit->GetChisquare()/fit->GetNDF());
-    printf("Total entries       : %f\n",        hc->GetEntries());
-    printf("Total rate          : %f per sec\n",N_total);
-    printf(" - BiPo             : %f per sec\n",N_bipo);
-    printf(" - Flat             : %f per sec\n",N_bg);
-    printf("Extrapolated rate   : %f +/- %f BiPos per 3.2ms readout\n",n_bipo,n_bipo_err);
-    printf("Equivalent activity : %f +/- %f mBq/kg\n",activity_mBq,activity_mBq_err);
-    printf("(assumed eff = %f)\n",_effMC);
+    printf("p0          : %f +/- %f\n", p0, p0_err);
+    printf("p1          : %f +/- %f\n", p1, p1_err);
+    printf("Chi2/ndf    : %f\n",        chi2ndf);
+    printf("Total rate  : %f per sec\n",N_total);
+    printf(" - BiPo     : %f per sec\n",N_bipo);
+    printf(" - Flat     : %f per sec\n",N_bg);
+    printf("Rate        : %f +/- %f (stat) +/- %f (syst) BiPos per 3.2 ms\n",n_bipo,n_bipo_err,n_bipo_syst);
+    printf("            = %f +/- %f BiPos per 3.2 ms\n",n_bipo,sqrt(pow(n_bipo_err,2)+pow(n_bipo_syst,2)));
+    printf("Activity    : %f +/- %f (stat) +/- %f (syst) mBq/kg\n",activity,activity_err,activity_syst);
+    printf("            = %f +/- %f mBq/kg\n",activity,activity_errTot);
+    printf("(assumed eff = %f)\n",effMC);
 
     out.rate_signal       = n_bipo;
-    out.rate_signal_err   = n_bipo_err;
-    out.rate_bg           = N_bg;
-    out.rate_bg_err       = N_bg_err;
-    out.p0                = fit->GetParameter(0);
-    out.p0_err            = fit->GetParError(0);
-    out.p1                = fit->GetParameter(1);
-    out.p1_err            = fit->GetParError(1);
-    out.activity          = activity_mBq;
-    out.activity_err      = activity_mBq_err;
+    out.rate_signal_err   = sqrt(pow(n_bipo_err,2) + pow(n_bipo_syst,2) );
+    out.N_signal          = N_bipo;
+    out.N_signal_err      = N_bipo_err;
+    out.N_bg              = N_bg;
+    out.N_bg_err          = N_bg_err;
+    out.p0                = p0;
+    out.p0_err            = p0_err;
+    out.p1                = p1;
+    out.p1_err            = p1_err;
+    out.activity          = activity;
+    out.activity_err      = activity_errTot;
+    out.activity_err_stat = activity_err;
+    out.activity_err_syst = activity_syst;
     return out;
   
   }
@@ -966,28 +1154,40 @@
   //################################################################################
   // Function to search for alpha candidates relative to a beta candidate
   //#################################################################################
-  std::vector<BiPoCandidate> FindCandidates(int ic, int wire_shift, bool flipdT, int& npileup, int& nwires ) {
+  std::vector<BiPoCandidate> FindCandidates(int ic, int wire_shift, int range, bool flipdT, int& npileup, int& npileup_20us, int& nwires ) {
     
     std::vector<BiPoCandidate> v;
     std::vector<int> cand_IDs;
     npileup = 0;
+    npileup_20us = 0;
 
     std::set<int> wires;
     int w1  = clust_startwire[ic] - wire_shift;
     int w2  = clust_endwire[ic] + wire_shift;
-    for(int i=w1-fWireRange; i<=w1+fWireRange; i++) wires.insert(i);
-    for(int i=w2-fWireRange; i<=w2+fWireRange; i++) wires.insert(i);
-    nwires = wires.size();
-    
-    /*
-    if( clust_startwire[ic] != clust_endwire[ic] ) {
-      for(int i=w2-fWireRange; i<w2+fWireRange; i++)
-        wires.insert(i);
+     
+
+    for(int i=w1-range; i<=w1+range; i++) wires.insert(i);
+    for(int i=w2-range; i<=w2+range; i++) wires.insert(i);
+
+  /*
+    if( fCheckWholeClust && wire_shift == 0 ) {
+      for(int i=w1-range; i<=w2+range; i++) wires.insert(i);
+    //} else if( wire_shift >= 3 ) {
+    //  for(int i=w1-1; i<=w1+1; i++) wires.insert(i);
+    //  for(int i=w2-1; i<=w2+1; i++) wires.insert(i);
+    } else {
+      for(int i=w1-range; i<=w1+range; i++) wires.insert(i);
+      for(int i=w2-range; i<=w2+range; i++) wires.insert(i);
     }
     */
+    //nwires = wires.size();
+    nwires = 0;
 
     for(auto iWire : wires ) {
-    
+      
+      if( wireIsBad[iWire] || wireIsNoisy[iWire] ) continue;
+      nwires++;
+
       for(auto& jc : _map_wire_clusters[iWire] ) {
         if( ic == jc ) continue;
         if( !_clustAvailable[jc] ) continue;
@@ -1008,11 +1208,15 @@
         // Count clusters in forward window, and fill some pre-cut histos
         if( dT > 0 && dT < fdT_max ) {
           npileup++;
+          if( dT < 20 ) npileup_20us++;
           // --- alpha charge/nhits cut ---
-          if(   clust_charge[jc] > fAlphaCharge_min 
-            &&  clust_charge[jc] < fAlphaCharge_max 
-            &&  clust_nwires[jc] <= fAlphaWires_max ) {
-            BiPoCandidate c = { clust_blipid[ic], ic, jc, dT, clust_charge[ic], clust_charge[jc]};
+          if(   
+                clust_charge[jc] > fAlphaCharge_min 
+            &&  clust_charge[jc] < fAlphaCharge_max ) {
+            //BiPoCandidate c = { clust_blipid[ic], ic, jc, dT, clust_charge[ic], clust_charge[jc], clust_rms[ic]/clust_amp[ic]};
+            float beta_mevee = (23.6E-6)*(clust_charge[ic]/0.584);
+            float alpha_mevee = (23.6E-6)*(clust_charge[jc]/0.584);
+            BiPoCandidate c = { clust_blipid[ic], ic, jc, dT, clust_charge[ic], clust_charge[jc], beta_mevee, alpha_mevee};
             v.push_back(c);
             cand_IDs.push_back(jc);
           }
@@ -1036,6 +1240,6 @@
   }
 
   double calcActivity(double n, double eff){
-    return 1e3 * (1./eff) * n / 85000.; 
+    return 1e3 * (n/eff) / 85000.; 
   }
 

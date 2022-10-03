@@ -45,11 +45,17 @@ void AddTextLine(TLatex* t, float x, float y, int lineNum, std::string line){
   t->DrawLatex( x, y-(lineNum-1)*t->GetTextSize(), line.c_str());
 }
 
+
 void ScaleHist(TH1D* h, std::string mode){
-  float factor = 1./h->GetEntries();
+  //float factor = 1./h->GetEntries();
+  float factor = 1./h->Integral();
   if( mode == "height" ) factor = 1./GetHistMax(h);
   h->Scale(factor);
   h->SetOption("hist");
+}
+
+void NormalizeHist(TH1D* h){
+  ScaleHist(h,"");
 }
 
 
@@ -287,6 +293,75 @@ TH2D* Clone(TH2D* h){
   return h2;
 }
 
+//#########################################################################################
+void DivideHist(TH1D* h1, TH1D* h2){
+  int nbins = h1->GetXaxis()->GetNbins();
+  if( h2->GetXaxis()->GetNbins() != nbins ) return;
+  for(int i=0; i<=nbins; i++){
+    double num = h1->GetBinContent(i);
+    double denom = h2->GetBinContent(i);
+    double newval = 0;
+    if( denom != 0 ) newval = num/denom;
+    h1->SetBinContent(i,newval);
+    h2->SetBinError(i,0);
+  }
+}
+
+//##########################################################################################
+TGraphErrors* MakeGraph(const TH1D* h){
+    std::string name  = h->GetName();
+    std::string title = h->GetTitle();
+    TGraphErrors* gr = new TGraphErrors();
+    gr->SetName(name.c_str());
+    gr->SetTitle(title.c_str());
+    gr->GetXaxis()->SetTitle(h->GetXaxis()->GetTitle());
+    gr->GetYaxis()->SetTitle(h->GetYaxis()->GetTitle());
+    for(size_t i=1; i<=h->GetXaxis()->GetNbins(); i++){
+      int pt = gr->GetN();
+      float x = h->GetBinCenter(i);
+      float y = h->GetBinContent(i);
+      if( y == 0 ) continue;
+      float dx = h->GetBinWidth(i)/sqrt(12);
+      float dy = h->GetBinError(i);
+      gr->SetPoint(pt, x, y);
+      gr->SetPointError(pt, dx, dy);
+    }
+  return gr;
+}
+
+//##########################################################################################
+void ShiftBins(TH1D* h, int shift){
+  int bins = h->GetXaxis()->GetNbins();
+  TH1D* h2 = (TH1D*)h->Clone("h2");
+  h->Reset();
+  for(int i=1; i<=bins; i++){
+    int prevBin = i - shift;
+    if( prevBin < 1 || prevBin > bins ) continue;
+    h->SetBinContent(i,h2->GetBinContent(prevBin));
+    h->SetBinError(i,h2->GetBinError(prevBin));
+  }
+  return;
+}
+
+//#########################################################################################
+TH1D* ScaleXAxis(TH1D* h, float factor, std::string new_name = ""){
+  int nbins = h->GetXaxis()->GetNbins();
+  float ll = h->GetXaxis()->GetXmin() * factor;
+  float ul = h->GetXaxis()->GetXmax() * factor;
+  std::string title = h->GetTitle();
+  std::string name = h->GetName();
+  name += "_scaled";
+  if( new_name != "" ) {
+    name = new_name;
+  } 
+  TH1D* h2 = new TH1D(name.c_str(),title.c_str(),nbins,ll,ul);
+  for(int i=1; i<=nbins; i++){
+    h2->SetBinContent(i, h->GetBinContent(i));
+    h2->SetBinError(i, h->GetBinError(i));
+  }
+  return h2;
+}
+
 //##########################################################################################
 TH1D* Make1DSlice(const TH2D* h2d, int bin1, int bin2, std::string name)
 {
@@ -315,6 +390,44 @@ TH1D* Make1DSlice(const TH2D* h2d, int bin1, int bin2, std::string name)
 
 TH1D* Make1DSlice(const TH2D* h2d, int bin1, int bin2){
   return Make1DSlice(h2d,bin1,bin2,"h");
+}
+
+// ====================================================================================
+// Calculates the chi-squared goodness of match between two histograms. It is assumed
+// that the 1st histograms (h1) is data and the 2nd (h2) is MC. 
+
+float GetChi2(TH1D* h1, TH1D* h2, float x1, float x2){
+  int nbins = h1->GetNbinsX();
+  int nbins2 = h2->GetNbinsX();
+  if( nbins != nbins2 ) {
+    std::cout<<"!!!! GetChi2(): number of bins does not match !!!\n";
+    return -9.; 
+  }
+  
+  float sum = 0.;
+  int N = 0;
+  for(int i=1; i<=nbins; i++){
+    float x_l = h1->GetXaxis()->GetBinLowEdge(i);
+    float x_u = h1->GetXaxis()->GetBinLowEdge(i+1);
+    float x   = h1->GetXaxis()->GetBinCenter(i);
+    if( x_l < x1 || x_u > x2 ) continue;
+    float b1 = float(h1->GetBinContent(i));
+    float b2 = float(h2->GetBinContent(i));
+    float e1 = h1->GetBinError(i);
+    float e2 = h2->GetBinError(i);
+    float sig = sqrt( pow(e1,2) + pow(e2,2) );
+    if( sig == 0. ) continue;
+    sum += pow( (b1-b2)/sig, 2 );
+    N++;
+  }
+
+  std::cout<<"ChiSquare comparison: "<<nbins<<" bins total, "<<N<<" bins used, sum_chi2 = "<<sum<<" --> "<<sum/N<<"\n";
+  if( N ) return sum / N; 
+  else return -9.;
+}
+
+float GetChi2(TH1D* h1, TH1D* h2){
+  return GetChi2(h1,h2,-9e9,9e9);
 }
 
 

@@ -20,15 +20,22 @@
     double p0, p0_err, p1, p1_err;
     double rate_signal     = -9;
     double rate_signal_err = 0;
-    double rate_bg         = -9;
-    double rate_bg_err     = 0;
+    double N_signal    = -9;
+    double N_signal_err = 0;
+    double N_bg         = -9;
+    double N_bg_err     = 0;
     double ratio           = -9;
     double activity        = -9;
     double activity_err    = -9;
+    double activity_err_stat = -9;
+    double activity_err_syst = -9;
   };
   
   // useful structure to save candidate info in
-  struct BiPoCandidate { int blipID, id1, id2; float dT, q1, q2; };
+  struct BiPoCandidate { 
+    int blipID, id1, id2; 
+    float dT, q1, q2, e1, e2;
+  };
 
   //##########################################################################
   // Set default ROOT plot style
@@ -60,11 +67,11 @@
     // use bold lines and markers
     //gStyle->SetLineWidth(2);
     gStyle->SetMarkerStyle(20);
-    gStyle->SetMarkerSize(0.8);
+    gStyle->SetMarkerSize(0.7);
     gStyle->SetMarkerColor(kAzure-6);
 
     // get rid of X error bars 
-    gStyle->SetErrorX(0.001);
+    //gStyle->SetErrorX(0.001);
 
     // do not display any of the standard histogram decorations
     //atlasStyle->SetOptTitle(0);
@@ -77,5 +84,8 @@
     //atlasStyle->SetPadTickX(1);
     //atlasStyle->SetPadTickY(1);
   }
+
+  //##########################################################################
+  // Ru
 
   

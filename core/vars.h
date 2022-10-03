@@ -1,11 +1,14 @@
   
+	
+  // Number of planes
+  const int kNplanes  = 3;  
+  
   // Set max array sizes
-	const int kMaxHits  = 100000;
-	const int kMaxBlips = 10000;
-	const int kMaxTrks  = 100;
-	const int kMaxG4    = 10000;
-	const int kMaxEDeps = 10000;
-	const int kNplanes  = 3;  
+	const int kMaxHits  = 30000;
+	const int kMaxBlips = 500;
+	const int kMaxTrks  = 500;
+	const int kMaxG4    = 1000;
+	const int kMaxEDeps = 1000;
   const int kMaxShwrs = 1000;    
   
   // --- Event information ---   
@@ -41,7 +44,7 @@
   float part_pathlen[kMaxG4];          // path length (cm)
   float part_depEnergy[kMaxG4];        // energy deposited in AV (MeV)
   int   part_depElectrons[kMaxG4];     // electrons deposited
-  float part_numElectrons[kMaxG4];     // electrons reaching anode wires
+  int   part_numElectrons[kMaxG4];     // electrons reaching anode wires
   std::vector<std::string> *part_process;// process name
   //float total_depEnergy;          // total deposited energy in AV
   //int   total_depElectrons;       // total deposited ionization electrons in AV
@@ -57,7 +60,7 @@
   int   edep_blipid[kMaxEDeps];   // reconstructed blip ID
   int   edep_electrons[kMaxEDeps];    // total ionization electrons deposited
   int   edep_charge[kMaxEDeps];   // total electrons reaching anode wires
-  float edep_tdrift[kMaxEDeps];
+  int   edep_tdrift[kMaxEDeps];
   float edep_energy[kMaxEDeps];   // total energy deposited (MeV)
   float edep_x[kMaxEDeps];        // x (cm)
   float edep_y[kMaxEDeps];        // y (cm)
@@ -111,7 +114,7 @@
   int   clust_endwire[kMaxHits];      // ending wire
   int   clust_nwires[kMaxHits];       // number of wires in this cluster
   int   clust_nhits[kMaxHits];        // number of hits
-  float clust_time[kMaxHits];         // charge-weighted time
+  int   clust_time[kMaxHits];         // charge-weighted time
   float clust_timespan[kMaxHits];     // cluster timespan
   float clust_rms[kMaxHits];          // charge-weighted RMS
   float clust_starttime[kMaxHits];    // cluster start tick
@@ -145,13 +148,12 @@
   float blip_dx[kMaxBlips];           // dX [cm]
   float blip_dyz[kMaxBlips];
   float blip_sumadc[kMaxBlips];          // integrated ADCs 
-  float blip_charge[kMaxBlips];       // blip charge at anode [e-]
+  int   blip_charge[kMaxBlips];       // blip charge at anode [e-]
   float blip_energy[kMaxBlips];       // blip energy [MeV]
   int   blip_edepid[kMaxBlips];       // true energy dep ID
   float blip_trkdist[kMaxBlips];      // distance to nearest track
   int   blip_trkid[kMaxBlips];        // index of nearest trk
   bool  blip_incylinder[kMaxBlips];   // is blip within a cylinder near a track
-  float blip_time[kMaxBlips];                   // blip drift time [ticks]
   int   blip_clustid[kNplanes][kMaxBlips];     // cluster ID per plane
 
 //################################
