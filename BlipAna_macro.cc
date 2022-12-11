@@ -9,7 +9,7 @@
 
 
 // General macro parameters
-std::string   fFileName     = "BlipAna_20220823_Eminus_Overlay_Standard.root";
+std::string   fFileName     = "BlipAna_20220823_Eminus_Overlay.root";
 std::string   fTreeName     = "blipana/anatree";
 float         thresh_emax   = 2.0; // MeV
 int           thresh_ebins  = 40; // # bins
@@ -52,6 +52,11 @@ TH2D* h_2D_chargeDep;
 TH1D* h_electron_chargeDep;
 TH1D* h_electron_count;
 
+// Energy resolution plots
+TH2D* h_energy_vs_res;
+TH1D* h_res;
+TH1D* h_bias;
+
 //#################################################################################
 void makeHistograms(){
   
@@ -64,6 +69,13 @@ void makeHistograms(){
   h_electron_count = (TH1D*)h_electron_chargeDep->Clone("e_count");
   h_2D_chargeDep = new TH2D("2D_chargedep",";Ionization charge deposited [e-];Energy deposited [MeV]",qbins,0,qmax,200,0,5);
   h_2D_chargeDep->SetOption("colz");
+
+  int res_bins = 20;
+  float res_energy_max = 4;
+  h_energy_vs_res = new TH2D("energy_vs_res","",res_bins,0,res_energy_max,200,-1.0,1.0);
+  h_energy_vs_res->SetOption("colz");
+  h_res   = new TH1D("res","",res_bins,0,res_energy_max);
+  h_bias  = new TH1D("bias","",res_bins,0,res_energy_max);
 
   // Plane coverage
   for(int i=0; i<kNplanes; i++){
@@ -169,21 +181,27 @@ void BlipAna_macro(){
       printf("========== EVENT %i / %i =====================\n",iEvent,totalEntries);
       print_counter = 1;
     }
-   
+  
+    std::cout<<"Event "<<iEvent<<"\n";
     // ------------------------------------------
     // Look at true blips ("edeps")
     // ------------------------------------------
+    std::cout<<"looping "<<nedeps<<" energy deps\n";
     for(int i=0; i<nedeps; i++) {
-      h_thresh_true_energy  ->Fill(edep_energy[i]);
+
+      std::cout<<" "<<i<<"   E= "<<edep_energy[i]<<"\n";
+      std::cout<<h_thresh_true_energy->GetEntries()<<"\n";
+      float energy = edep_energy[i];
+      h_thresh_true_energy  ->Fill(energy);
       
       if( edep_pdg[i] == 11 ) {
         //h_electron_chargeDep->Fill(edep_electrons[i],edep_energy[i]);
         h_electron_count->Fill(edep_electrons[i]);
-        h_2D_chargeDep->Fill(edep_electrons[i],edep_energy[i]);
+        h_2D_chargeDep->Fill(edep_electrons[i],energy);
       }
 
       if( edep_energy[i] > overthresh_value ) {
-        total_energy += edep_energy[i];
+        total_energy += energy;
         h_zy_true->Fill(edep_z[i],edep_y[i]);
       }
     
@@ -249,9 +267,19 @@ void BlipAna_macro(){
         
         if( isGood ) {
           nblips_truthmatched_perfect++;
+          float reco_energy = blip_energy[eid];
           float true_energy = edep_energy[eid];
+          float true_pdg    = edep_pdg[eid];
           h_thresh_reco_3D-> Fill(true_energy);
           if( nplanes == 3 ) h_thresh_reco_3D_3plane->Fill(true_energy);
+          
+          // energy resolution for electrons
+          if( edep_pdg[eid] == 11 ) {
+            std::cout<<"Calculating resolution for electron: true "<<true_energy<<", reco "<<reco_energy<<"\n";
+            float res = (reco_energy - true_energy)/true_energy;
+            h_energy_vs_res->Fill(true_energy,res);
+          }
+
         }
       
       }

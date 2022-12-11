@@ -114,13 +114,13 @@
   int   clust_endwire[kMaxHits];      // ending wire
   int   clust_nwires[kMaxHits];       // number of wires in this cluster
   int   clust_nhits[kMaxHits];        // number of hits
-  int   clust_time[kMaxHits];         // charge-weighted time
+  float clust_time[kMaxHits];         // charge-weighted time
   float clust_timespan[kMaxHits];     // cluster timespan
   float clust_rms[kMaxHits];          // charge-weighted RMS
   float clust_starttime[kMaxHits];    // cluster start tick
   float clust_endtime[kMaxHits];      // cluster end tick
   float clust_amp[kMaxHits];          // maximum hit amplitude [ADC]
-  float clust_charge[kMaxHits];       // cluster charge at anode [e-]
+  int   clust_charge[kMaxHits];       // cluster charge at anode [e-]
   float clust_g4charge[kMaxHits];     // true cluster charge at anode
   float clust_g4energy[kMaxHits];     // true cluster energy from G4
   int   clust_g4id[kMaxHits];         // true MCParticle ID (index for particle branches)

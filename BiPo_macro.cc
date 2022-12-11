@@ -10,52 +10,56 @@
   
   // --- Choose run configuration ---
   int   fConfig   = 0;
-  float fMinHr    = 0; //30;
-  float fMaxHr    = 40e9; //10e9;
+  float fMinHr    = 0; 
+  float fMaxHr    = 40e9; 
   
-  float fakeLifetime = 5; // ms
-  float chargeScaling = 0.905; 
+  float chargeScaling = 1.0; //0.905; 
   TRandom2* fRand;
 
   // --- Input files ---
   infile_t fInputFiles[4] = {
-  /*0*/  { "BlipAna_20220915_BiPo_Overlay_QY62.root", "blipanaTrkMask/anatree",true,0,0},
-         //{ "BlipAna_20220812_Data_Overlay.root","blipanaTrkMask/anatree",false,0,0},
-  /*1*/  { "BlipAna_20220823_RadonData_Phase1.root","blipanaTrkMask/anatree",false,1627415210,1627592728},
-  /*2*/  { "BlipAna_20220823_RadonData_Phase2.root","blipanaTrkMask/anatree",false,1627594380,1627761265},
-  /*3*/  { "BlipAna_20220915_Data_Run3.root","blipanaTrkMask/anatree",false,1528526500,1532448800}
+  /*0*/  { "BlipAna_20221017_BiPo_Overlay_QY75.root", "blipanaTrkMask/anatree",true,0,0},
+         //{ "BlipAna_20221017_BiPo_MC.root", "blipana/anatree",true,0,0},
+         //{ "BlipAna_20221017_Data_Overlay.root","blipanaTrkMask/anatree",false,0,0},
+  /*1*/  { "BlipAna_20221017_RadonData_Phase1.root","blipanaTrkMask/anatree",false,1627415210,1627592728},
+  /*2*/  { "BlipAna_20221017_RadonData_Phase2.root","blipanaTrkMask/anatree",false,1627594380,1627761265},
+  /*3*/  { "BlipAna_20221017_Run3.root","blipanaTrkMask/anatree",false,1528526500,1532448800}
   };
   
-  float fAssumedTime  = 1150.; // us
   float fRecomb       = 0.584; 
 
   const float binPeriodHrs[4] = { 2,  2,   2,   48 };
   const float binPeriodMax[4] = { 44, 44, 44,  1104 };
 
+  int   fCaloMode         = 0;
+
   // --- General selection options ---
-  bool  fFidVolCut        = 1;      // Fiducialize beta
-  bool  fPickyBetaMode    = 0;      // Require beta blips match on all 3 planes
+  bool  fFidVolCut        = 1; //1;      // Fiducialize beta
+  bool  fPickyBetaMode    = 1;      // Require beta blips match on all 3 planes
+  int   fBetaWires_max    = 4;
   float fBetaCharge_min   = 12e3;   // Min charge of beta candidate blip [e-]
   float fBetaCharge_max   = 90e3;   // Max charge of beta candidate blip [e-]
   float fBetaEnergy_min   = 0.5;    // 
   float fBetaEnergy_max   = 3.5;    
   int   fWireRange        = 0;      // +/- range to look for alpha candidate;
+  int   fAlphaWires_max   = 2;
   float fAlphaCharge_min  = 0e3;    // Min charge of alpha candidate cluster [e-]
   float fAlphaCharge_max  = 6e3;    // Max charge of alpha candidate cluster [e-]
   float fAlphaEnergy_min  = 0;
-  float fAlphaEnergy_max  = 0.24;   //
+  float fAlphaEnergy_max  = 0.15; //0.24; //0.24 nominal;   //
   bool  fLinearizeCorr    = 1;      // Linearize detector effects control facto
   float fdT_binSize       = 20.;    // Bin width for all dT spectra plots [us]
-  float fdT_min           = 20.;    // Min dT for looking for candidate [us]
-  float fdT_max           = 500.;   // Max dT for looking for candidate [us]
+  float fdT_min           = 60.;    // Min dT for looking for candidate [us]
+  float fdT_max           = 340.;   // Max dT for looking for candidate [us]
   
   // --- MC efficiency for equiv activity calc ---
   double fEfficiencyMC      = 0.11;
   double fEfficiencyMC_err  = 0.03;
 
-  // --- MC options ---
+  // --- Special MC options ---
   bool  fIgnoreTrueAlphas = false;
   bool  fIgnoreTrueGammas = false;
+  bool  fIgnoreNonMC      = false; //true;
 
   // --- Detector properties ---
   int   nWiresColl        = 3455;
@@ -66,7 +70,6 @@
   // --- Special switches ---
   int   fRandomWireShift  = 0; 
   int   fBackgroundMode   = 1;      // 0= wire-shift, 1= dT-flip
-  bool  fCheckWholeClust  = false; //true;
   
   // --- Noisy wires to skip (collection plane) ---
   std::vector<int> fNoisyWires{
@@ -145,8 +148,8 @@
   void                        setRootStyle();
   std::vector<BiPoCandidate>  FindCandidates(int, int, int, bool, int&, int&, int&);
   FitResult                   fitdT(TH1D*,bool,bool);
-  int                         FindG4Index(int);
-  double                      calcActivity(double,double);
+  //int                         FindG4Index(int);
+  //double                      calcActivity(double,double);
   
   // ROOT objects
   TTree*      fTree;
@@ -155,7 +158,9 @@
   // Histograms
   TDirectory* tdir_util;
   TDirectory* tdir_plots;
-  TH1D* h_alpha_nwires;
+ 
+  TH1D* h_cuts;
+
   TH1D* h_nclusts_inwindow;
   TH1D* h_nclusts_20us;
   TH1D* h_ncands_inwindow;
@@ -175,6 +180,8 @@
   TH2D* h_wt_blips_filt;
   TH2D* h_wt_bipos;
   TH2D* h_zy_bipos;
+  TH2D* h_zy_bipos_bg;
+  TH2D* h_zy_bipos_sub;
 
   TH1D* h_time_vs_N;        
   TH2D* h_2D_time_vs_dT;
@@ -197,12 +204,19 @@
   TH1D* h_beta_energy;
   TH1D* h_beta_energy_bg;
   TH1D* h_beta_energy_sub;
-  
+ 
+  TH2D* h_alpha_energyVsdT;
 
   TH1D* h_true_alpha_depne;
   TH1D* h_true_alpha_charge;
   TH1D* h_matched_alpha_charge;
-
+  
+  TH1D* h_beta_trueEnergy;
+  TH1D* h_beta_trueEnergySum;
+  TH1D* h_beta_trueEnergySum_reco;
+  TH1D* h_beta_trueEnergySum_recoCuts;
+  TH1D* h_beta_nwires;
+  TH1D* h_alpha_nwires;
   
   //##########################################################################
   // Initialize histograms
@@ -210,22 +224,51 @@
   void makeHistograms()
   {
     fOutFile->cd();
-   
+    
     //fOutTree = new TTree("bipoTree","bipoTree");
     //fOutTree ->SetBranchAddress("event",);
     //fOutTree ->SetBranchAddress("event_hr");
 
-    h_alpha_nwires       = new TH1D("alpha_nwires","Candidate alpha clusters (coll plane);Wire extent",20,0,20);
+    //int ncuts = 5;
+    //h_cuts = new TH1D("cuts","Blip cut analysis",
+    
+    // E = (Q/R) * 23.6E-6 MeV
+    float alphaQmax   = fAlphaCharge_max; 
+    int   alphaQbins  = alphaQmax/200.;
+    float betaQmax    = fBetaCharge_max;
+    int   betaQbins   = betaQmax/2000;
+    float alphaEmax   = fAlphaEnergy_max;
+    int   alphaEbins    = fAlphaEnergy_max/0.01;
+    float betaEmax    = fBetaEnergy_max;
+    int   betaEbins   = fBetaEnergy_max/0.10;
+
+    h_beta_nwires = new TH1D("beta_nwires","True beta cluster;Number of collection plane wires;Entries",10,0,10);
+    h_alpha_nwires = new TH1D("alpha_nwires","True alpha cluster;Number of collection plane wires;Entries",10,0,10);
+
+    h_beta_trueEnergy             = new TH1D("beta_trueEnergy",             "All true decays;Electron true energy [MeV];Entries per bin",70,0,betaEmax);
+    h_beta_trueEnergySum          = new TH1D("beta_trueEnergySum",          "All true decays;Decay vertex true energy [MeV];Entries per bin",70,0,betaEmax);
+    h_beta_trueEnergySum_reco     = new TH1D("beta_trueEnergySum_reco",     "Reco'd on coll plane;Decay vertex true energy [MeV];Entries per bin",70,0,betaEmax);
+    h_beta_trueEnergySum_recoCuts = new TH1D("beta_trueEnergySum_recoCuts", "blip cuts;Decay vertex true energy [MeV];Entries per bin",70,0,betaEmax);
+    
+    //h_beta_trueEnergy = new TH1D("beta_trueEnergy","True #beta energy;Decay vertex true energy [MeV];Entries per bin",175,0,betaEmax);
+    //h_beta_trueEnergy_reco = new TH1D("beta_trueEnergy_reco","True #beta energy;Decay vertex true energy [MeV];Entries per bin",175,0,betaEmax);
+
+    //h_alpha_nwires       = new TH1D("alpha_nwires","Candidate alpha clusters (coll plane);Wire extent",20,0,20);
     h_nclusts_inwindow  = new TH1D("nclusts_inwindow","Mean clusters per wire in time window following Bi-candidate",50,0,5);
     h_nclusts_20us      = new TH1D("nclusts_20us","Mean clusters per wire <20#mus following Bi-candidate",50,0,5);
     h_ncands_inwindow   = new TH1D("ncands_inwindow","Number of Po candidates in time window following Bi-candidate",10,0,10);
     
-    float Zmin = -100;  float Zmax = 1100;  int Zbins = 600;
-    float Ymin = -150;  float Ymax = 150;   int Ybins = 150;
+    float Zmin = -100;  float Zmax = 1100;  int Zbins = 120;
+    float Ymin = -150;  float Ymax = 150;   int Ybins = 30;
     float Tmin = -1000;     float Tmax = 6000;  int Tbins = 700; 
     float Wmin = -100;  float Wmax = 3500;  int Wbins = 1800; 
     h_zy_bipos      = new TH2D("zy_bipos","BiPo candidates;Z [cm]; Y [cm]",Zbins,Zmin,Zmax,Ybins,Ymin,Ymax);
     h_zy_bipos      ->SetOption("colz");
+    h_zy_bipos_bg      = new TH2D("zy_bipos_bg","Background BiPo candidates;Z [cm]; Y [cm]",Zbins,Zmin,Zmax,Ybins,Ymin,Ymax);
+    h_zy_bipos_bg      ->SetOption("colz");
+    h_zy_bipos_sub      = new TH2D("zy_bipos_sub","Backgrounds-subtracted BiPo candidates;Z [cm]; Y [cm]",Zbins,Zmin,Zmax,Ybins,Ymin,Ymax);
+    h_zy_bipos_sub      ->SetOption("colz");
+    
     h_wt_clusts     = new TH2D("wt_clusts","2D clusts;Collection Plane Wire; Ticks",Wbins,Wmin,Wmax,Tbins,Tmin,Tmax);
     h_wt_blips      = new TH2D("wt_blips","3D blips;Collection Plane Wire; Ticks",Wbins,Wmin,Wmax,Tbins,Tmin,Tmax);
     h_wt_blips_filt = new TH2D("wt_blips_filt","3D blips (quality cuts);Collection Plane Wire; Ticks",Wbins,Wmin,Wmax,Tbins,Tmin,Tmax);
@@ -245,10 +288,6 @@
     h_control_dT_flip   = new TH1D("control_dT_flip","OFFSET REGION;Time difference [#mus];Number of candidates", dTbins,0.,fdT_max);
     h_control_dT_ratio  = new TH1D("control_dT_ratio","OFFSET REGION;Time difference [#mus];Number of candidates", dTbins,0.,fdT_max);
 
-    float alphaQmax   = fAlphaCharge_max; 
-    int   alphaQbins  = alphaQmax/200.;
-    float betaQmax    = fBetaCharge_max;
-    int   betaQbins   = betaQmax/2000;
     h_alpha_charge      = new TH1D("alpha_charge","Candidate alphas;Collected charge [e^{-}];Entries per second", alphaQbins, 0, alphaQmax);
     h_alpha_charge_bg   = (TH1D*)h_alpha_charge->Clone("alpha_charge_bg");
     h_alpha_charge_sub  = (TH1D*)h_alpha_charge->Clone("alpha_charge_sub");
@@ -258,11 +297,6 @@
     h_beta_charge_sub   = (TH1D*)h_beta_charge->Clone("beta_charge_sub");
     h_beta_charge_sub   ->SetTitle("Candidate betas after background subtraction");
    
-    // E = (Q/R) * 23.6E-6 MeV
-    float alphaEmax   = fAlphaEnergy_max;
-    int alphaEbins    = fAlphaEnergy_max/0.01;
-    float betaEmax    = fBetaEnergy_max;
-    int   betaEbins   = fBetaEnergy_max/0.10;
     h_alpha_energy      = new TH1D("alpha_energy","Candidate alphas;Electron-equivalent energy [MeVee];Entries per second", alphaEbins, 0, alphaEmax);
     h_alpha_energy_bg   = (TH1D*)h_alpha_energy->Clone("alpha_energy_bg");
     h_alpha_energy_sub  = (TH1D*)h_alpha_energy->Clone("alpha_energy_sub");
@@ -271,6 +305,9 @@
     h_beta_energy_bg    = (TH1D*)h_beta_energy->Clone("beta_energy_bg");
     h_beta_energy_sub   = (TH1D*)h_beta_energy->Clone("beta_energy_sub");
     h_beta_energy_sub   ->SetTitle("Candidate betas after background subtraction");
+
+    h_alpha_energyVsdT = new TH2D("alpha_energyVsdT","Alpha candidates;#DeltaT [#mus];Energy [MeVee]",dTbins,0.,fdT_max,alphaEbins,0,alphaEmax);
+    h_alpha_energyVsdT->SetOption("colz");
 
     int   timeBins  = binPeriodMax[fConfig]/binPeriodHrs[fConfig];
     float timeMax   = binPeriodMax[fConfig];
@@ -326,7 +363,6 @@
     fTree->SetBranchAddress("nclusts",&nclusts);                     
     fTree->SetBranchAddress("clust_nwires",&clust_nwires);
     fTree->SetBranchAddress("clust_plane",&clust_plane);              
-    fTree->SetBranchAddress("clust_wire",&clust_wire);                
     fTree->SetBranchAddress("clust_startwire",&clust_startwire);                
     fTree->SetBranchAddress("clust_endwire",&clust_endwire);                
     fTree->SetBranchAddress("clust_nhits",&clust_nhits);              
@@ -335,7 +371,6 @@
     fTree->SetBranchAddress("clust_blipid",&clust_blipid);            
     fTree->SetBranchAddress("nblips",&nblips);                       
     fTree->SetBranchAddress("blip_nplanes",&blip_nplanes);
-    fTree->SetBranchAddress("blip_sigmayz",&blip_sigmayz);
     fTree->SetBranchAddress("blip_energy",&blip_energy);
     fTree->SetBranchAddress("blip_y",&blip_y);                        
     fTree->SetBranchAddress("blip_z",&blip_z);                        
@@ -348,10 +383,13 @@
       fTree->SetBranchAddress("clust_edepid",&clust_edepid);            
       fTree->SetBranchAddress("nparticles",&nparticles);
       fTree->SetBranchAddress("part_isPrimary",&part_isPrimary);
-      fTree->SetBranchAddress("part_trackID",&part_trackID);
+      fTree->SetBranchAddress("part_mother",&part_mother);
+      //fTree->SetBranchAddress("part_trackID",&part_trackID);
       fTree->SetBranchAddress("part_pdg",&part_pdg);
+      fTree->SetBranchAddress("part_KE",&part_KE);
       //fTree->SetBranchAddress("part_startT",&part_startT);
       fTree->SetBranchAddress("edep_g4id",&edep_g4id);
+      fTree->SetBranchAddress("edep_energy",&edep_energy);
       fTree->SetBranchAddress("edep_pdg",&edep_pdg);
       fTree->SetBranchAddress("edep_electrons",&edep_electrons);
       fTree->SetBranchAddress("edep_charge",&edep_charge);
@@ -375,7 +413,12 @@
     if( fPickyBetaMode ) {
       _betaMinPlanes    = 3;      // Min number of matched planes (must be 2 or 3)
       _betaMaxDiff      = 1;      // Difference in wire intersection points [cm]
-    } 
+    }
+
+    if( fCaloMode ) {
+      fBetaCharge_min = 0;
+      fBetaEnergy_min = 0;
+    }
   
     if( fBackgroundMode == 1 ) _minTick = (int)fdT_max*2;
     _liveTimePerEvt  = (_maxTick-_minTick)*fSamplePeriod*1e-6; //sec
@@ -386,13 +429,16 @@
     for(auto iwire : fNoisyWires )  wireIsNoisy[iwire] = true;
     for(auto iwire : fBadWires )    wireIsBad[iwire] = true;
 
+
+
+
     // ****************************************************
     // Loop over the events
     // ****************************************************
     std::time_t loopStart = time(0);
     size_t totalEntries = fTree->GetEntries();
     for(size_t iEvent=0; iEvent < totalEntries; iEvent++){
-      
+
       print_counter++;
       if( print_counter > 1000 ) {
         printf("========== EVENT %lu / %lu, %6.2f %%, BiPo count: %i =====================\n",
@@ -405,18 +451,20 @@
       
       // ..... quick-test options ...........
       //int maxEvt    = 1000; if(  iEvent >= maxEvt ) break;
-      //int sparsify  = 10; if(  (iEvent % sparsify) != 0 ) continue; 
+      //int sparsify  = 1000; if(  (iEvent % sparsify) != 0 ) continue; 
       //..................................
 
       // Retrieve event info
       fTree->GetEntry(iEvent);
-      
+     
+
       // Record the event time relative to start of dataset period
       double eventHr = ( timestamp - inFile.t0 ) / 3600.;
       if( !_isMC && (eventHr < fMinHr || eventHr > fMaxHr) ) continue;
       h_time_vs_N->Fill(eventHr);
       _numEvents++;
-      
+     
+
       // ===============================================================
       // Clear masks to track cluster availability to avoid double-counts
       // ===============================================================
@@ -425,9 +473,46 @@
       // ======================================
       // Check truth info
       // ======================================
-        int alphaPDG = 1000020040;
+      int alphaPDG = 1000020040;
+
+      std::vector<bool> g4_isBeta(nparticles,false);
+      
+      // keep track of the number of primary electrons per decay
+      // (we want to exclude events with Auger electrons, which 
+      // are unlikely to be selected in our sample)
+      int nPrimaryElectrons = 0;
+      float sumBetaEnergy = 0;
+      for(int i=0; i<nparticles; i++){
+        int pdg = part_pdg[i];
+        int isPrimary = part_isPrimary[i];
+        int mother = part_mother[i];
+        float KE = part_KE[i];
+        
+
+
+        if( !part_isPrimary[i] || part_mother[i] > 0 ) continue;
+        //printf("  %i   isPrimary? %i   PDG: %i    Mother: %i    KE: %f\n",i,(int)isPrimary,pdg,mother,KE);
+        
+        if( part_pdg[i]==11 ) {
+          g4_isBeta[i] = true;
+          nPrimaryElectrons++;
+          sumBetaEnergy += KE;
+          //h_beta_trueEnergy->Fill(KE);
+        }
+
+        if( part_pdg[i] == alphaPDG ) {
+          //if( nPrimaryElectrons == 1 ) 
+          h_beta_trueEnergySum->Fill(sumBetaEnergy);
+          nPrimaryElectrons = 0;
+          sumBetaEnergy = 0;
+          //std::cout<<"Found alpha\n";
+        }
+
+      
+      }
+      
         for(int i=0; i<nedeps; i++){
-          int g4index = FindG4Index(edep_g4id[i]);
+          int g4index = edep_g4id[i]; //FindG4Index(edep_g4id[i]);
           int   q_dep   = edep_electrons[i];
           int   q_drift = edep_charge[i];
           if( !part_isPrimary[g4index] ) continue;
@@ -441,17 +526,21 @@
               _numBiPo_true_perfectReco++;
           }
         }
+
       
-      // look for collection plane clusts matched to an alpha
+        // look for collection plane clusts matched to an alpha, beta, or gamma
         clust_isAlpha.assign(nclusts, false); 
         clust_isBeta.assign(nclusts, false); 
         clust_isGamma.assign(nclusts, false); 
         for(int i=0; i < nclusts; i++){
-          if( clust_plane[i] != 2 ) continue;
+          //if( clust_plane[i] != 2 ) continue;
           int eid = clust_edepid[i];
-          if( eid < 0 ) continue;
-          int g4index = FindG4Index(edep_g4id[eid]);
-          if( part_isPrimary[g4index] ) {
+          if( eid < 0 ) {
+            if( fIgnoreNonMC ) _clustAvailable[i] = false;
+            continue;
+          }
+          int g4index = edep_g4id[eid]; //FindG4Index(edep_g4id[eid]);
+          if( part_isPrimary[g4index] && part_mother[g4index] == 0 ) {
             if(part_pdg[g4index] == alphaPDG )  clust_isAlpha[i] = true;
             if(part_pdg[g4index] == 11)         clust_isBeta[i]  = true;
           } else {
@@ -461,6 +550,20 @@
           // Option to ignore alpha blips for background assessment
           if( fIgnoreTrueAlphas && clust_isAlpha[i] ) _clustAvailable[i] = false;
           if( fIgnoreTrueGammas && clust_isGamma[i] ) _clustAvailable[i] = false;
+
+          if( clust_plane[i] == 2 ) {
+          
+            // ---beta plots ---
+            if( clust_isBeta[i] ) {
+              h_beta_nwires->Fill(clust_nwires[i]);
+              h_beta_trueEnergySum_reco->Fill(edep_energy[eid]);
+            }
+            
+
+            // --- alpha plots ---
+            if( clust_isAlpha[i] ) h_alpha_nwires->Fill(clust_nwires[i]);
+
+          }
         }
 
 
@@ -472,11 +575,12 @@
       for(int i=0; i < nclusts; i++){
         if( clust_plane[i] != 2 ) continue;
         clust_charge[i] *= chargeScaling;
+        h_wt_clusts->Fill(clust_startwire[i],clust_time[i]);
         for(int j=clust_startwire[i]; j<=clust_endwire[i]; j++)
-          _map_wire_clusters[clust_wire[i]].push_back(i);
-        h_wt_clusts->Fill(clust_wire[i],clust_time[i]);
+          _map_wire_clusters[j].push_back(i);
       }
 
+      
       /*
       // ==============================================================
       // Create list of blip IDs sorted by charge
@@ -503,33 +607,38 @@
 
         // find associated cluster on collection
         int   ic    = blip_clustid[2][iBlip];
+        int   ied   = clust_edepid[ic];
   
         // plot wire-time coordinate
-        h_wt_blips->Fill( clust_wire[ic], clust_time[ic] );
+        h_wt_blips->Fill( clust_startwire[ic], clust_time[ic] );
   
         // skip if this cluster was already included in a BiPo candidate 
         if( !_clustAvailable[ic] ) continue;
+      
         
-        float corrFact    = 1.0;
-        corrFact    = exp(fAssumedTime/lifetime);
-        float beta_charge = clust_charge[ic]*corrFact;
-        float beta_energy = ( beta_charge / fRecomb ) * (23.6e-6);
+        //float corrFact    = 1.0;
+        float beta_charge = clust_charge[ic]; //*corrFact;
+        float beta_energy = blip_energy[iBlip]; //( beta_charge / fRecomb ) * (23.6e-6);
+        int   beta_wires  = clust_nwires[ic];
 
-        // apply charge/size cuts on beta
-        if(   //clust_charge[ic] < fBetaCharge_min 
-          //||  
-          clust_charge[ic] > fBetaCharge_max ) continue;
-        
         // blip plane-matching requirements
         if( blip_nplanes[iBlip] < _betaMinPlanes ) continue;
-        if( blip_sigmayz[iBlip] > _betaMaxDiff ) continue;
+        //if( blip_sigmayz[iBlip] > _betaMaxDiff ) continue;
         
         // evaluate if in fiducial volume
         if( fFidVolCut ) {
           if( blip_z[iBlip] < fZlim[0] || blip_z[iBlip] > fZlim[1] ) continue;
           if( blip_y[iBlip] < fYlim[0] || blip_y[iBlip] > fYlim[1] ) continue;
         }
-       
+        
+        // apply charge/size cuts on beta
+        if(   beta_wires  > fBetaWires_max  ||
+              //beta_charge < fBetaCharge_min || 
+              //beta_charge > fBetaCharge_max ) 
+              beta_energy < fBetaEnergy_min || 
+              beta_energy > fBetaEnergy_max ) 
+          continue;
+
 
   			// skip if any wire in cluster is from a noisy wire
         // skip if this cluster is at the very edge of the wireplane
@@ -544,7 +653,9 @@
           }
         }
         if( flag ) continue;
-       
+        
+        
+        
         // require semi-isolation (no other clusters within +/-20us)
         for(int iwire = w_start; iwire <= w_end; iwire++){
           for(auto& jc : _map_wire_clusters[iwire] ) {
@@ -555,14 +666,22 @@
         } 
         if( flag ) continue;
 
+
         // fill some blip/cluster location histograms
-        h_wt_blips_filt->Fill( clust_wire[ic], clust_time[ic] );
-      
+        h_wt_blips_filt->Fill( clust_startwire[ic], clust_time[ic] );
+       
+        if( clust_isBeta[ic] ) {
+          h_beta_trueEnergySum_recoCuts->Fill( edep_energy[ied] );
+        }
+
         // skip if we are near end of wire (account for 400us/800tick trigger offset)
         float peakT = clust_time[ic]+800;
         if( peakT < 0 )         continue;
         if( peakT > _maxTick )  continue;
         if( peakT < _minTick )  continue; 
+        
+        
+        //std::cout<<"beta charge "<<beta_charge<<"\n";
         
 
 
@@ -572,13 +691,15 @@
         int nclusts_inwindow        = 0;
         int nclusts_20us            = 0;
 
+        //std::cout<<"Standard cand search\n";
         // Search for standard candidates first
         int nwires = 0;
         std::vector<BiPoCandidate> v_cands = FindCandidates(ic, 0, fWireRange, false, nclusts_inwindow,nclusts_20us,nwires);
         h_nclusts_inwindow->Fill(float(nclusts_inwindow)/nwires);
         h_nclusts_20us->Fill(float(nclusts_20us)/nwires);
         h_ncands_inwindow->Fill((int)v_cands.size());
-        
+       
+        //std::cout<<"FOUND "<<v_cands.size()<<" CANDIDATES!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
         int ngood = 0;
         for(auto& thisCand : v_cands) {
           _clustAvailable[ic] = false;
@@ -588,13 +709,15 @@
           h_beta_energy         ->Fill(thisCand.e1);
           h_alpha_charge        ->Fill(thisCand.q2);
           h_alpha_energy        ->Fill(thisCand.e2);
-          if( thisCand.q1 < fBetaCharge_min ) continue;
+          h_alpha_energyVsdT    ->Fill(thisCand.dT,thisCand.e2);
+          //if( thisCand.q1 < fBetaCharge_min ) continue;
+          if( thisCand.e1 < fBetaEnergy_min ) continue;
           ngood++;
           h_zy_bipos->Fill( blip_z[iBlip], blip_y[iBlip]);
-          h_wt_bipos->Fill( clust_wire[ic], clust_time[ic]);
+          h_wt_bipos->Fill( clust_startwire[ic], clust_time[ic]);
           h_cand_dT             ->Fill(thisCand.dT);
           h_2D_time_vs_dT       ->Fill(eventHr,thisCand.dT);
-          h_alpha_nwires        ->Fill(clust_nwires[thisCand.id2]);
+          //h_alpha_nwires        ->Fill(clust_nwires[thisCand.id2]);
         }
         if( ngood ) {
             _numBiPo++;
@@ -638,24 +761,28 @@
         }//end evaluation of standard cands
         */
        
+        //std::cout<<"Control regions\n";
         // Search for candidates in control region shifted +5 wires away
         int a, b, n;
         std::vector<BiPoCandidate> v_control      = FindCandidates(ic, 5, 2, false, a, b, n );
         std::vector<BiPoCandidate> v_control_flip = FindCandidates(ic, 5, 2, true, a, b, n );
         for( auto& vc : v_control )       {
-          if( vc.q1 > fBetaCharge_min ) h_control_dT      ->Fill( vc.dT );
+          h_control_dT ->Fill( vc.dT );
+          //if( vc.q1 > fBetaCharge_min ) h_control_dT      ->Fill( vc.dT );
         }
         for( auto& vc : v_control_flip )  {
-          if( vc.q1 > fBetaCharge_min ) h_control_dT_flip ->Fill( vc.dT );
+          h_control_dT_flip ->Fill( vc.dT );
+          //if( vc.q1 > fBetaCharge_min ) h_control_dT_flip ->Fill( vc.dT );
         }
         
         // Search for background candidates (wire shift)
-        int nwires_shift = 0;
-        int shift = 2*fWireRange+1;
-        int nclusts_inwindow_shift  = 0;
-        int nclusts_20us_shift      = 0;
-        std::vector<BiPoCandidate> v_cands_shift = FindCandidates(ic,shift,fWireRange,false,nclusts_inwindow_shift,nclusts_20us_shift,nwires_shift);
+        //int nwires_shift = 0;
+        //int shift = 2*fWireRange+1;
+        //int nclusts_inwindow_shift  = 0;
+        //int nclusts_20us_shift      = 0;
+        //std::vector<BiPoCandidate> v_cands_shift = FindCandidates(ic,shift,fWireRange,false,nclusts_inwindow_shift,nclusts_20us_shift,nwires_shift);
 
+        //std::cout<<"background region\n";
         // Search for background candidates (same wire, but dT-flip)
         int nclusts_inwindow_flip;
         int nclusts_20us_flip;
@@ -664,7 +791,7 @@
 
 
        
-
+        /*
         // --------------------------------------------
         // Evaluate wire shift candidates
         // ---------------------------------------------
@@ -690,6 +817,7 @@
             }
           }
         }
+        */
         
         // --------------------------------------------
         // Evaluate dT-flip candidates
@@ -703,8 +831,9 @@
             h_beta_energy_bg         ->Fill(thisCand.e1);
             h_alpha_charge_bg        ->Fill(thisCand.q2);
             h_alpha_energy_bg        ->Fill(thisCand.e2);
+            h_zy_bipos_bg->Fill( blip_z[iBlip], blip_y[iBlip]);
           }
-          if( thisCand.q1 < fBetaCharge_min ) continue;
+          //if( thisCand.q1 < fBetaCharge_min ) continue;
           h_cand_dT_flip             ->Fill(thisCand.dT);
           if( fBackgroundMode == 1 )
             h_2D_time_vs_dT_bg    ->Fill(eventHr,thisCand.dT);
@@ -785,6 +914,7 @@
     h_beta_charge_sub     ->Add(h_beta_charge,    1);
     h_alpha_energy_sub    ->Add(h_alpha_energy,   1);
     h_beta_energy_sub     ->Add(h_beta_energy,    1);
+    h_zy_bipos_sub         ->Add(h_zy_bipos,      1);
     //h_beta_ratio_sub      ->Add(h_beta_ratio,     1);
 
     switch(fBackgroundMode){
@@ -796,6 +926,7 @@
     h_beta_charge_sub->Add(h_beta_charge_bg,-1.);
     h_alpha_energy_sub->Add(h_alpha_energy_bg,-1.);
     h_beta_energy_sub->Add(h_beta_energy_bg,-1.);
+    h_zy_bipos_sub->Add(h_zy_bipos_bg,-1);
     //h_beta_ratio_sub->Add(h_beta_ratio_bg,-1.);
 
     // ***************************************************
@@ -1077,7 +1208,8 @@
     double p1       = fit->GetParameter(1);
     double p1_err   = fit->GetParError(1);
     double tau      = fit->GetParameter(2);
-    double chi2ndf  = fit->GetChisquare()/fit->GetNDF();
+    double chi2     = fit->GetChisquare();
+    int    ndf      = fit->GetNDF();
     double n_bipo   = (p1*tau)/fdT_binSize;
     double n_bipo_err = (p1_err*tau)/fdT_binSize;
     
@@ -1104,10 +1236,9 @@
     // Error terms for specific activity calculation
     double err1   = (n_bipo!=0) ? fabs(n_bipo_err/n_bipo) : 0.;
     double err2a  = (n_bipo!=0) ? fabs(n_bipo_syst/n_bipo) : 0.;
-    //double err2a  = 0;
     double err2b  = (effMC>0) ? effMC_syst/effMC : 0.;
 
-    double activity       = calcActivity(n_bipo,effMC);
+    double activity       = 1e3 * n_bipo / effMC / 85000.; //calcActivity(n_bipo,effMC);
     double activity_err   = fabs(activity) * err1;
     double activity_syst  = fabs(activity) * sqrt( pow(err2a,2) + pow(err2b,2) );
     double activity_errTot = sqrt( pow(activity_err,2) + pow(activity_syst,2) );
@@ -1122,7 +1253,7 @@
     printf("================ dT fit =================\n");
     printf("p0          : %f +/- %f\n", p0, p0_err);
     printf("p1          : %f +/- %f\n", p1, p1_err);
-    printf("Chi2/ndf    : %f\n",        chi2ndf);
+    printf("Chi2/ndf    : %f / %i = %f\n",chi2,ndf,chi2/ndf);
     printf("Total rate  : %f per sec\n",N_total);
     printf(" - BiPo     : %f per sec\n",N_bipo);
     printf(" - Flat     : %f per sec\n",N_bg);
@@ -1155,7 +1286,8 @@
   // Function to search for alpha candidates relative to a beta candidate
   //#################################################################################
   std::vector<BiPoCandidate> FindCandidates(int ic, int wire_shift, int range, bool flipdT, int& npileup, int& npileup_20us, int& nwires ) {
-    
+   
+    //std::cout<<"looking for cands; beta clust "<<ic<<", beta range "<<clust_startwire[ic]<<", "<<clust_endwire[ic]<<"... shift "<<wire_shift<<"    range "<<range<<"\n";
     std::vector<BiPoCandidate> v;
     std::vector<int> cand_IDs;
     npileup = 0;
@@ -1164,62 +1296,56 @@
     std::set<int> wires;
     int w1  = clust_startwire[ic] - wire_shift;
     int w2  = clust_endwire[ic] + wire_shift;
+    
+    //std::cout<<"w1 w2 "<<w1<<"  "<<w2<<"\n";
      
 
     for(int i=w1-range; i<=w1+range; i++) wires.insert(i);
     for(int i=w2-range; i<=w2+range; i++) wires.insert(i);
 
-  /*
-    if( fCheckWholeClust && wire_shift == 0 ) {
-      for(int i=w1-range; i<=w2+range; i++) wires.insert(i);
-    //} else if( wire_shift >= 3 ) {
-    //  for(int i=w1-1; i<=w1+1; i++) wires.insert(i);
-    //  for(int i=w2-1; i<=w2+1; i++) wires.insert(i);
-    } else {
-      for(int i=w1-range; i<=w1+range; i++) wires.insert(i);
-      for(int i=w2-range; i<=w2+range; i++) wires.insert(i);
-    }
-    */
-    //nwires = wires.size();
     nwires = 0;
 
     for(auto iWire : wires ) {
-      
+      //std::cout<<"checking wire "<<iWire<<"\n";
+
       if( wireIsBad[iWire] || wireIsNoisy[iWire] ) continue;
       nwires++;
+      
 
+      //std::cout<<"There are "<<_map_wire_clusters[iWire].size()<<" clusts on this wire\n";
       for(auto& jc : _map_wire_clusters[iWire] ) {
+        
         if( ic == jc ) continue;
         if( !_clustAvailable[jc] ) continue;
         if( std::count(cand_IDs.begin(),cand_IDs.end(),jc) ) continue;
 
-        //... temporary ... 
-        //exclude electrons
-        //int eid = clust_edepid[jc];
-        //if( eid >= 0 ) {
-        //  //std::cout<<"Found an alpha cand that is matched "<<eid<<"   pdg "<<edep_pdg[eid]<<"\n";
-        //  if( fabs(edep_pdg[eid]) == 11 ) continue;
-        //}
-        //
-
         float dT        = (clust_time[jc]-clust_time[ic])*fSamplePeriod;
         if (flipdT) dT  *= -1.;
         
+        //std::cout<<"  dT "<<dT<<"\n";
+       
+        
+
         // Count clusters in forward window, and fill some pre-cut histos
         if( dT > 0 && dT < fdT_max ) {
           npileup++;
           if( dT < 20 ) npileup_20us++;
           // --- alpha charge/nhits cut ---
-          if(   
-                clust_charge[jc] > fAlphaCharge_min 
-            &&  clust_charge[jc] < fAlphaCharge_max ) {
-            //BiPoCandidate c = { clust_blipid[ic], ic, jc, dT, clust_charge[ic], clust_charge[jc], clust_rms[ic]/clust_amp[ic]};
-            float beta_mevee = (23.6E-6)*(clust_charge[ic]/0.584);
-            float alpha_mevee = (23.6E-6)*(clust_charge[jc]/0.584);
-            BiPoCandidate c = { clust_blipid[ic], ic, jc, dT, clust_charge[ic], clust_charge[jc], beta_mevee, alpha_mevee};
-            v.push_back(c);
-            cand_IDs.push_back(jc);
-          }
+          //std::cout<<"clust charge "<<clust_charge[ic]<<"\n";
+          float beta_E = (23.6e-6)*(clust_charge[ic]/0.584);
+          float alpha_E = (23.6e-6)*(clust_charge[jc]/0.584);
+          //std::cout<<"dT = "<<dT<<"    beta "<<beta_E<<"    alpha "<<alpha_E<<"\n";
+          if( clust_nwires[jc] <= fAlphaWires_max
+            //&&  clust_charge[jc] > fAlphaCharge_min 
+            //&&  clust_charge[jc] < fAlphaCharge_max ) {
+            &&  alpha_E > fAlphaEnergy_min 
+            &&  alpha_E < fAlphaEnergy_max ) {
+              //std::cout<<"Found candidate\n";
+              //BiPoCandidate c = { clust_blipid[ic], ic, jc, dT, clust_charge[ic], clust_charge[jc], clust_rms[ic]/clust_amp[ic]};
+              BiPoCandidate c = { clust_blipid[ic], ic, jc, dT, clust_charge[ic], clust_charge[jc], beta_E, alpha_E};
+              v.push_back(c);
+              cand_IDs.push_back(jc);
+            }
           
          
         }//end min dT req 
@@ -1232,14 +1358,11 @@
 
 
   //###################################################################
-  int FindG4Index(int g4id) {
-    for(size_t i=0; i<nparticles; i++) {
-      if( part_trackID[i] == g4id ) return i;
-    }
-    return -9;
-  }
+  //int FindG4Index(int g4id) {
+  //  for(size_t i=0; i<nparticles; i++) {
+  //    if( part_trackID[i] == g4id ) return i;
+  //  }
+  //  return -9;
+  //}
 
-  double calcActivity(double n, double eff){
-    return 1e3 * (n/eff) / 85000.; 
-  }
 

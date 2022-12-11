@@ -34,7 +34,9 @@
   // useful structure to save candidate info in
   struct BiPoCandidate { 
     int blipID, id1, id2; 
-    float dT, q1, q2, e1, e2;
+    float dT;
+    int q1, q2;
+    float e1, e2;
   };
 
   //##########################################################################
@@ -68,7 +70,8 @@
     //gStyle->SetLineWidth(2);
     gStyle->SetMarkerStyle(20);
     gStyle->SetMarkerSize(0.7);
-    gStyle->SetMarkerColor(kAzure-6);
+    //gStyle->SetMarkerColor(kAzure-6);
+    gStyle->SetMarkerColor(kBlack);
 
     // get rid of X error bars 
     //gStyle->SetErrorX(0.001);
