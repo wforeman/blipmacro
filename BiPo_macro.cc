@@ -9,15 +9,16 @@
   #include <time.h>
   
   // --- Choose run configuration ---
-  int   fConfig   = 3;
+  int   fConfig   = 0;
   float fMinHr    = -40e9; 
   float fMaxHr    = 40e9; 
   float qscale    = 1.0; //0.905;
 
   // --- Input files ---
   infile_t fInputFiles[4] = {
-  /*0*/  //{ "BlipAna_20230103_BiPo_OverlayNEST_Fano0_8ms.root",    "blipanaTrkMask/anatree", true,   0,0},
-  /*0*/  { "BlipAna_20221215_BiPo_Overlay_QY62_8ms.root",         "blipanaTrkMask/anatree", true,   0,0},
+  /*0*/   { "BlipAna_20230108_BiPo_OverlayNEST_8ms.root",    "blipanaTrkMask/anatree", true,   0,0},
+  /*0*/  //{ "BlipAna_20230108_BiPo_Overlay.root",         "blipanaTrkMask/anatree", true,   0,0},
+  /*0*/  //{ "BlipAna_20221215_BiPo_Overlay.root",         "blipanaTrkMask/anatree", true,   0,0},
 
   /*1*/  { "BlipAna_20230108_Data_RadonDoping_FullFilter.root",   "blipanaTrkMask/anatree", false,  1627415210, 1627592728},
   /*2*/  { "BlipAna_20230108_Data_RadonDoping_FilterBypass.root", "blipanaTrkMask/anatree", false,  1627594380, 1627761265},
@@ -43,7 +44,7 @@
   float fdT_binSize       = 20.;    // Bin width for all dT spectra plots [us]
   float fdT_min           = 20.;    // Min dT for looking for candidate [us]
   float fdT_max           = 500.;   // Max dT for looking for candidate [us]
-  bool  fSkipNoisyWires   = true;
+  bool  fSkipNoisyWires   = 1;
 
   // --- MC efficiency for equiv activity calc ---
   double fEfficiencyMC      = 0.078;
@@ -349,8 +350,8 @@
     fTree->SetBranchAddress("clust_plane",&clust_plane);              
     fTree->SetBranchAddress("clust_startwire",&clust_startwire);                
     fTree->SetBranchAddress("clust_endwire",&clust_endwire);               
-    fTree->SetBranchAddress("clust_starttime",&clust_starttime);
-    fTree->SetBranchAddress("clust_endtime",&clust_endtime);
+    //fTree->SetBranchAddress("clust_starttime",&clust_starttime);
+    //fTree->SetBranchAddress("clust_endtime",&clust_endtime);
     fTree->SetBranchAddress("clust_nhits",&clust_nhits);              
     fTree->SetBranchAddress("clust_charge",&clust_charge);            
     fTree->SetBranchAddress("clust_time",&clust_time);                
@@ -441,7 +442,7 @@
       _map_wire_clusters.clear();
       for(int i=0; i < nclusts; i++){
         clust_charge[i] *= qscale;
-        //if( clust_deadwiresep[i] < 0 ) clust_deadwiresep[i]=999; // TEMP (fixed in blipana as of 1/5/23)
+        if( clust_deadwiresep[i] < 0 ) clust_deadwiresep[i]=999; // TEMP (fixed in blipana as of 1/5/23)
         if( clust_deadwiresep[i] < 1 ) _clustAvailable[i]=false;
         if( clust_plane[i] != 2 ) continue;
         h_wt_clusts->Fill(clust_startwire[i],clust_time[i]);
@@ -635,9 +636,6 @@
         if( peakT < 0 )         continue;
         if( peakT > _maxTick )  continue;
         if( peakT < _minTick )  continue; 
-        
-        
-        //std::cout<<"beta charge "<<beta_charge<<"\n";
         
 
 
