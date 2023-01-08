@@ -1,15 +1,13 @@
   
-	
-  // Number of planes
+  // ********************************************
+  // TTree branch variables
+  // ********************************************
   const int kNplanes  = 3;  
-  
-  // Set max array sizes
 	const int kMaxHits  = 30000;
 	const int kMaxBlips = 500;
 	const int kMaxTrks  = 500;
-	const int kMaxG4    = 1000;
+	const int kMaxG4    = 5000;
 	const int kMaxEDeps = 1000;
-  const int kMaxShwrs = 1000;    
   
   // --- Event information ---   
   int           event;                    // event number
@@ -46,12 +44,10 @@
   int   part_depElectrons[kMaxG4];     // electrons deposited
   int   part_numElectrons[kMaxG4];     // electrons reaching anode wires
   std::vector<std::string> *part_process;// process name
-  //float total_depEnergy;          // total deposited energy in AV
-  //int   total_depElectrons;       // total deposited ionization electrons in AV
-  //float total_numElectrons;       // total electrons reaching anode wires
 
   // --- True energy deposit info (derived from SimChannels and SimEnergyDeposits) ---
   int   nedeps;                   // number of true localized energy depositions
+  bool  edep_isPrimary[kMaxEDeps];
   int   edep_tpc[kMaxEDeps];      // TPC
   int   edep_g4id[kMaxEDeps];     // leading G4 track ID
   int   edep_g4index[kMaxEDeps];  // leading G4 track index
@@ -127,14 +123,7 @@
   int   clust_blipid[kMaxHits];       // blip ID for this nlusteer (if it was made into one)
   int   clust_edepid[kMaxHits];       // true energy dep ID
   bool  clust_ismatch[kMaxHits];      // was this cluster plane-matched?
-  //int   clust_lhit_wire[kMaxHits];    // cluster wire (lead hit wire)
-  //int   clust_lhit_chan[kMaxHits];    // cluster channel (lead hit wire)
-  //int   clust_lhit_id[kMaxHits];      // lead hit ID (index for hit_X[i] branches)
-  //float clust_lhit_amp[kMaxHits];     // lead hit peak amplitude [ADC]
-  //float clust_lhit_rms[kMaxHits];     // lead hit RMS [ADC]
-  //float clust_lhit_time[kMaxHits];    // lead hit time [ticks]
-  //float clust_lhit_gof[kMaxHits];     // lead hit goodness-of-fit; pulse train = -1
-  //bool  clust_lhit_isfit[kMaxHits];   // is there a valid goodness of fit for lead hit?
+  int   clust_deadwiresep[kMaxHits];  // 
 
   // --- 3D Blip information ---
   int   nblips;                       // number of blips in event
@@ -153,6 +142,7 @@
   int   blip_edepid[kMaxBlips];       // true energy dep ID
   float blip_trkdist[kMaxBlips];      // distance to nearest track
   int   blip_trkid[kMaxBlips];        // index of nearest trk
+  float blip_yzcorr[kMaxBlips];
   bool  blip_incylinder[kMaxBlips];   // is blip within a cylinder near a track
   int   blip_clustid[kNplanes][kMaxBlips];     // cluster ID per plane
 

@@ -58,6 +58,17 @@ void NormalizeHist(TH1D* h){
   ScaleHist(h,"");
 }
 
+void NormalizeHistInRange(TH1D* h, float x1, float x2){
+  int nbins = h->GetXaxis()->GetNbins();
+  float sum = 0;
+  for(size_t i=1; i<=nbins; i++){
+    float x = h->GetXaxis()->GetBinCenter(i);
+    if( x > x1 && x < x2 ) sum += h->GetBinContent(i);
+  }
+  h->Scale(1/sum);
+  h->SetOption("hist");
+}
+
 
 TPaveText* MakeTextBox(float x, float y, float textSize, float numLines, float width){
   TPaveText *pt = new TPaveText(x, y-numLines*textSize, x+width, y, "NDC");
@@ -150,9 +161,9 @@ void FormatAxes(TGraphAsymmErrors* g, float axisTitleSize, float axisLabelSize, 
   g->GetYaxis()->SetTitleOffset(yOffset);
 }
 
-void FormatTH1D(TH1D* h, Color_t lc, int ls, int lwidth){
-  h->SetLineColor(lc);
-  h->SetLineStyle(ls);
+void FormatTH1D(TH1D* h, Color_t lcolor, int lstyle, int lwidth){
+  h->SetLineColor(lcolor);
+  h->SetLineStyle(lstyle);
   h->SetLineWidth(lwidth);
 }
 
@@ -312,7 +323,7 @@ TGraphErrors* MakeGraph(const TH1D* h){
     std::string name  = h->GetName();
     std::string title = h->GetTitle();
     TGraphErrors* gr = new TGraphErrors();
-    gr->SetName(name.c_str());
+    gr->SetName((name+"_gr").c_str());
     gr->SetTitle(title.c_str());
     gr->GetXaxis()->SetTitle(h->GetXaxis()->GetTitle());
     gr->GetYaxis()->SetTitle(h->GetYaxis()->GetTitle());
@@ -371,7 +382,11 @@ TH1D* Make1DSlice(const TH2D* h2d, int bin1, int bin2, std::string name)
   float mean = 0.5*(h2d->GetXaxis()->GetBinCenter(bin1) + h2d->GetXaxis()->GetBinCenter(bin2));
   name = Form("%s_%d_%d",name.c_str(),bin1,bin2);
   
-  TH1D* h = new TH1D(name.c_str(),Form("1D slice: bins %d-%d (x= %f)",bin1,bin2,mean),nbins,xmin,xmax);
+  TH1D* h;
+  if(bin1==bin2)  h = new TH1D(name.c_str(),Form("1D slice: bin %d (x= %.2f)",  bin1,mean),nbins,xmin,xmax);
+  else            h = new TH1D(name.c_str(),Form("1D slice: bins %d-%d (x= %f)",bin1,bin2,mean),nbins,xmin,xmax);
+  
+  h->GetXaxis()->SetTitle( h2d->GetYaxis()->GetTitle() );
 
   for(int j=1; j<=nbins; j++){
     float sum_bc = 0;
@@ -395,17 +410,11 @@ TH1D* Make1DSlice(const TH2D* h2d, int bin1, int bin2){
 // ====================================================================================
 // Calculates the chi-squared goodness of match between two histograms. It is assumed
 // that the 1st histograms (h1) is data and the 2nd (h2) is MC. 
-
-float GetChi2(TH1D* h1, TH1D* h2, float x1, float x2){
+void CalcChi2(TH1D* h1, TH1D* h2, double& chi2Sum, int& ndf, float x1=-9e9, float x2=9e9){
   int nbins = h1->GetNbinsX();
-  int nbins2 = h2->GetNbinsX();
-  if( nbins != nbins2 ) {
-    std::cout<<"!!!! GetChi2(): number of bins does not match !!!\n";
-    return -9.; 
-  }
-  
-  float sum = 0.;
-  int N = 0;
+  if( nbins != h2->GetNbinsX() ) { std::cout<<"Bins don't match!!!\n"; return;}
+  chi2Sum = 0.;
+  ndf     = 0;
   for(int i=1; i<=nbins; i++){
     float x_l = h1->GetXaxis()->GetBinLowEdge(i);
     float x_u = h1->GetXaxis()->GetBinLowEdge(i+1);
@@ -417,18 +426,30 @@ float GetChi2(TH1D* h1, TH1D* h2, float x1, float x2){
     float e2 = h2->GetBinError(i);
     float sig = sqrt( pow(e1,2) + pow(e2,2) );
     if( sig == 0. ) continue;
-    sum += pow( (b1-b2)/sig, 2 );
-    N++;
+    //std::cout<<"bin "<<i<<"  val1= "<<b1<<" +/- "<<e1<<", val2= "<<b2<<" +/- "<<e2<<"\n";
+    chi2Sum += pow( (b1-b2)/sig, 2 );
+    ndf++;
   }
-
-  std::cout<<"ChiSquare comparison: "<<nbins<<" bins total, "<<N<<" bins used, sum_chi2 = "<<sum<<" --> "<<sum/N<<"\n";
-  if( N ) return sum / N; 
-  else return -9.;
+  std::cout<<"ChiSquare comparison: "<<nbins<<" bins total, "<<ndf<<" bins used, sum_chi2 = "<<chi2Sum<<"\n";
+  return;
 }
 
-float GetChi2(TH1D* h1, TH1D* h2){
-  return GetChi2(h1,h2,-9e9,9e9);
+double CalcChi2(TH1D* h1, TH1D* h2, float x1=-9e9, float x2=9e9){
+  double chi2 = 0;
+  int ndf = 0;
+  CalcChi2(h1,h2,chi2,ndf,x1,x2);
+  return chi2/ndf;
 }
+
+TH1D* GetHistogram(std::string fName, std::string hName, bool normalize){
+  TFile* file = new TFile(fName.c_str());
+  TH1D* h = (TH1D*)file->Get(hName.c_str());
+  if(normalize) NormalizeHist(h);
+  return h;
+  delete file;
+}
+
+
 
 
 

@@ -3,9 +3,12 @@
   //
   // Mike Z.'s elog entry 126161: bypass started 7/29/21 16:33 --> 1627594380
   //
-  // Run 3 dataset: 
+  // Run 3 data//set: 
   //  T0 = 1528520000 (9 June 2018, 23:53)
   //  T1 = 1531760000 (16 July 2018, 11:53)
+  
+  TRandom2* fRand;
+  float fRecomb       = 0.584; 
   
   struct infile_t { 
     std::string   fileName;
@@ -35,7 +38,7 @@
   struct BiPoCandidate { 
     int blipID, id1, id2; 
     float dT;
-    int q1, q2;
+    float q1, q2;
     float e1, e2;
   };
 
@@ -56,8 +59,8 @@
 
     // use large fonts
     //Int_t font=42; // Helvetica
-    Double_t tsize=0.040;
-    Double_t lsize=0.040;
+    Double_t tsize=0.05;
+    Double_t lsize=0.05;
     gStyle->SetTitleSize(tsize,"x");
     gStyle->SetLabelSize(lsize,"x");
     gStyle->SetTitleSize(tsize,"y");
@@ -72,6 +75,7 @@
     gStyle->SetMarkerSize(0.7);
     //gStyle->SetMarkerColor(kAzure-6);
     gStyle->SetMarkerColor(kBlack);
+    gStyle->SetLineColor(kBlack);
 
     // get rid of X error bars 
     //gStyle->SetErrorX(0.001);
@@ -89,6 +93,8 @@
   }
 
   //##########################################################################
-  // Ru
+  float charge_to_energy(float q, float recomb){
+    return (23.6e-6)*(q/recomb);
+  }
 
   
