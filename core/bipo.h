@@ -93,7 +93,7 @@
   }
 
   //##########################################################################
-  float charge_to_energy(float q, float recomb){
+  float charge_to_energy(float& q, float& recomb){
     return (23.6e-6)*(q/recomb);
   }
 

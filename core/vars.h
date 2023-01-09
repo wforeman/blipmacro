@@ -4,6 +4,7 @@
   // ********************************************
   const int kNplanes  = 3;  
 	const int kMaxHits  = 30000;
+  const int kMaxClusts = 3000;
 	const int kMaxBlips = 500;
 	const int kMaxTrks  = 500;
 	const int kMaxG4    = 5000;
@@ -102,28 +103,30 @@
 
   // --- Hit cluster information ---
   int   nclusts;                      // total clusters made
-  int   clust_id[kMaxHits];           // cluster ID (index)
-  int   clust_tpc[kMaxHits];          // cluster TPC ID
-  int   clust_plane[kMaxHits];        // cluster plane
-  int   clust_wire[kMaxHits];         // central-most wire of cluster
-  int   clust_startwire[kMaxHits];    // starting wire
-  int   clust_endwire[kMaxHits];      // ending wire
-  int   clust_nwires[kMaxHits];       // number of wires in this cluster
-  int   clust_nhits[kMaxHits];        // number of hits
-  float clust_time[kMaxHits];         // charge-weighted time
-  float clust_timespan[kMaxHits];     // cluster timespan
-  float clust_rms[kMaxHits];          // charge-weighted RMS
-  float clust_starttime[kMaxHits];    // cluster start tick
-  float clust_endtime[kMaxHits];      // cluster end tick
-  float clust_amp[kMaxHits];          // maximum hit amplitude [ADC]
-  int   clust_charge[kMaxHits];       // cluster charge at anode [e-]
-  float clust_g4charge[kMaxHits];     // true cluster charge at anode
-  float clust_g4energy[kMaxHits];     // true cluster energy from G4
-  int   clust_g4id[kMaxHits];         // true MCParticle ID (index for particle branches)
-  int   clust_blipid[kMaxHits];       // blip ID for this nlusteer (if it was made into one)
-  int   clust_edepid[kMaxHits];       // true energy dep ID
-  bool  clust_ismatch[kMaxHits];      // was this cluster plane-matched?
-  int   clust_deadwiresep[kMaxHits];  // 
+  int   clust_id[kMaxClusts];           // cluster ID (index)
+  int   clust_tpc[kMaxClusts];          // cluster TPC ID
+  int   clust_plane[kMaxClusts];        // cluster plane
+  int   clust_wire[kMaxClusts];         // central-most wire of cluster
+  int   clust_startwire[kMaxClusts];    // starting wire
+  int   clust_endwire[kMaxClusts];      // ending wire
+  int   clust_nwires[kMaxClusts];       // number of wires in this cluster
+  int   clust_nticks[kMaxClusts];       // number of ticks in this cluster
+  int   clust_nhits[kMaxClusts];        // number of hits
+  float clust_time[kMaxClusts];         // charge-weighted time
+  float clust_timespan[kMaxClusts];     // cluster timespan
+  float clust_rms[kMaxClusts];          // charge-weighted RMS
+  float clust_starttime[kMaxClusts];    // cluster start tick
+  float clust_endtime[kMaxClusts];      // cluster end tick
+  float clust_amp[kMaxClusts];          // maximum hit amplitude [ADC]
+  int   clust_charge[kMaxClusts];       // cluster charge at anode [e-]
+  float clust_g4charge[kMaxClusts];     // true cluster charge at anode
+  float clust_g4energy[kMaxClusts];     // true cluster energy from G4
+  int   clust_g4id[kMaxClusts];         // true MCParticle ID (index for particle branches)
+  int   clust_blipid[kMaxClusts];       // blip ID for this nlusteer (if it was made into one)
+  int   clust_edepid[kMaxClusts];       // true energy dep ID
+  bool  clust_ismatch[kMaxClusts];      // was this cluster plane-matched?
+  int   clust_deadwiresep[kMaxClusts];  // 
+  bool  clust_bydeadwire[kMaxClusts];
 
   // --- 3D Blip information ---
   int   nblips;                       // number of blips in event
