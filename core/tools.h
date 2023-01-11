@@ -4,7 +4,14 @@
 #include "TH2D.h"
 #include "TStyle.h"
 #include "TLine.h"
+#include "TLatex.h"
+#include "TPaveText.h"
+#include "TLegend.h"
+#include "TGraphErrors.h"
+#include "TGraphAsymmErrors.h"
+#include "TMultiGraph.h"
 #include <utility>
+  #include <iostream>
 
 // ######################################################################
 // Various tools and algorithms to make life easier
@@ -61,7 +68,7 @@ void NormalizeHist(TH1D* h){
 void NormalizeHistInRange(TH1D* h, float x1, float x2){
   int nbins = h->GetXaxis()->GetNbins();
   float sum = 0;
-  for(size_t i=1; i<=nbins; i++){
+  for(int i=1; i<=nbins; i++){
     float x = h->GetXaxis()->GetBinCenter(i);
     if( x > x1 && x < x2 ) sum += h->GetBinContent(i);
   }
@@ -110,7 +117,7 @@ void AddPointToGraph( TGraph* gr, float x, float y){
 
 TGraphErrors* HistToGraph(TH1D* h) {
   TGraphErrors* gr = new TGraphErrors();
-  for(size_t i=1; i < h->GetXaxis()->GetNbins(); i++) 
+  for(int i=1; i < h->GetXaxis()->GetNbins(); i++) 
     AddPointToGraph(gr, h->GetXaxis()->GetBinCenter(i), h->GetBinContent(i));
   return gr;
 }
@@ -327,7 +334,7 @@ TGraphErrors* MakeGraph(const TH1D* h){
     gr->SetTitle(title.c_str());
     gr->GetXaxis()->SetTitle(h->GetXaxis()->GetTitle());
     gr->GetYaxis()->SetTitle(h->GetYaxis()->GetTitle());
-    for(size_t i=1; i<=h->GetXaxis()->GetNbins(); i++){
+    for(int i=1; i<=h->GetXaxis()->GetNbins(); i++){
       int pt = gr->GetN();
       float x = h->GetBinCenter(i);
       float y = h->GetBinContent(i);

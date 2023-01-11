@@ -6,8 +6,10 @@
   // Run 3 data//set: 
   //  T0 = 1528520000 (9 June 2018, 23:53)
   //  T1 = 1531760000 (16 July 2018, 11:53)
-  
-  TRandom2* fRand;
+
+  bool CheckForCoherentNoise(const int id);
+  bool CheckForNearbyClusts(const int id);
+
   float fRecomb       = 0.584; 
   
   struct infile_t { 
