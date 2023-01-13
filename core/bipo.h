@@ -62,7 +62,7 @@
     // use large fonts
     //Int_t font=42; // Helvetica
     Double_t tsize=0.05;
-    Double_t lsize=0.05;
+    Double_t lsize=0.045;
     gStyle->SetTitleSize(tsize,"x");
     gStyle->SetLabelSize(lsize,"x");
     gStyle->SetTitleSize(tsize,"y");

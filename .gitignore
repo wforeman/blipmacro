@@ -8,3 +8,6 @@ old/*
 *.pdf
 *.root
 debug.*
+*ACLiC*
+*.d
+*.so
