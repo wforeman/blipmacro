@@ -48,9 +48,9 @@
   // --- Event/wire quality cuts ---
   //  - Run3 periods:  910 +/- 6 (long tail)
   //  - R&D periods:   975 +/- 8
-  bool  fNoisyEvtCuts       = 0;
-  int   fMaxAllowedTrks     = 50;  
-  int   fMaxAllowedBadChans = 1000; //950; 
+  bool  fNoisyEvtCuts       = 1;
+  int   fMaxAllowedTrks     = 999;  
+  int   fMaxAllowedBadChans = 1000;
   bool  fSkipNoisyWires     = true;
   
   // --- General selection options ---
